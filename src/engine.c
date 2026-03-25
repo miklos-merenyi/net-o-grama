@@ -16,7 +16,6 @@ extern struct node* head;
 struct dlb_node* dlbHead;
 extern char rootWord[10];
 char spc=' '+32;
-int blank[9];
 int lettersNum = 7;
 int gameStart = 0;
 int gameTime=AVAILABLE_TIME;

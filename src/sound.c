@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-#include <SDL.h>
-#include <SDL_mixer.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_mixer.h>
 #include "debug.h"
 
 // audio vars
@@ -63,7 +63,12 @@ void pushSound(struct sound** soundCache, char* name, char* filename)
     struct sound* thisSound = NULL;
 
     thisSound = malloc(sizeof(struct sound));
-    thisSound->name = malloc(sizeof(name)*strlen(name));
+    if (!thisSound) return;
+    thisSound->name = malloc(strlen(name) + 1);
+    if (!thisSound->name) {
+        free(thisSound);
+        return;
+    }
     strcpy(thisSound->name, name);
     thisSound->next = *soundCache;
 
@@ -143,7 +148,7 @@ int initSound()
     int audio_channels = 1;
     int audio_buffers = 256;
 
-    if(Mix_OpenAudio(audio_rate, audio_format, audio_channels, audio_buffers))
+    if (Mix_OpenAudio(audio_rate, audio_format, audio_channels, audio_buffers) < 0)
     {
         debug(0,"unable to open audio!\n");
         exit(1);
@@ -158,6 +163,6 @@ int initSound()
 int endSound()
 {
     Mix_CloseAudio();
-    clearSoundBuffer(&soundCache);
+    clearSoundBuffer();
     return 0;
 }

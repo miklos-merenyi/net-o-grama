@@ -53,7 +53,7 @@ int ans_len;
 int quit=0;
 int nop=0;                       // number of players
 int delAnswer=1;                 // makes difference betwen pressing Enter  and Right_arrow.
-int gameTime;
+extern int gameTime;
 int gameIsOn=0;
 int id;
 char state=0;

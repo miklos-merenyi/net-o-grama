@@ -18,7 +18,7 @@
 #include "debug.h"
 #include "linked.h"
 #include "engine.h"
-char srvname[50];
+extern char srvname[50];
 extern int port;
 extern char usrname[9];
 void initConnection(char* server, int port) ;

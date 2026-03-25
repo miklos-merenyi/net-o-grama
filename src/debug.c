@@ -39,9 +39,12 @@ void echof(int level, char* msg, ...)
     if (level>debugLevel) return;
     va_list ap;
     va_start(ap,msg);
+    /* vfechof() consumes the va_list; copy it before reusing. */
+    va_list ap2;
+    va_copy(ap2, ap);
     vfechof(stdout,"",msg,ap);
-    if (logstream) vfechof(logstream,"debug :",msg,ap);
-
+    if (logstream) vfechof(logstream,"debug :",msg,ap2);
+    va_end(ap2);
     va_end(ap);
 }
 

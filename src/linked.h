@@ -11,8 +11,8 @@
 #define WAITING 7                //game is on, waiting for approve for a guess
 #define ENDED 8                  //game is ended
 
-int debugLevel;
-char * logfile;
+extern int debugLevel;
+extern char * logfile;
 struct node
 {
     char    anagram[10];
