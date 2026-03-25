@@ -1,0 +1,25 @@
+Client:
+	-see others connecting/disconnecting during and out of gametime 
+	    -new sounds, possibly with ogg format
+    -highlight the winner at the end
+    -add "--nosound" option 
+	-(find out how to handle CTRL+<key> with ncurses)
+
+Server:
+	-query settings
+	-separate command prompt (not to be mixed with other messages)
+    -gui
+    -check the words against aspell (w.i.p.)
+
+Both:
+	-different game modes (lock found words out or not)
+    -different scorings (more progressive with words' length)
+    -support other languages
+	-handle SIGNALs properly (close sockets etc...)
+
+Others:
+	-srcript to start a one-player game easily
+	-SDL client (in progress...)
+
+Many more...
+	

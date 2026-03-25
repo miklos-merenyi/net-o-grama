@@ -1,2 +1,86 @@
 # net-o-grama
 Net-o-Grama is a networked anagram game, which can be played by up to 4 players, but playing alone is also supported. Currently the server and a terminal (ncurses) based client for Linux is ready.
+2008 (C) Miklos Merenyi miklos.merenyi@gmail.com
+ 
+The original project was hosted at https://sourceforge.net/projects/net-o-grama/, but I lost my access, so I'm migrating to github at v.3.0
+
+The idea, the current sounds, and many functions came from the nice Anagramarama game (http://www.coralquest.com/anagramarama/) written by Colm Gallagher ( colm@coralquest.com ).
+
+For displaying large letters on the console I used code found on http://ftp.uniroma2.it/unix/comp.sources.unix/volume26/banners/part01. 
+    
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+
+Compiling:
+----------
+You need to have the development files for glib-2.0, ncurses, sdl and sdl-mixer,
+    cd to the main dir of net-o-grama:
+
+    $make all 
+        this will produce 3 executables: 
+            nog_srv - the server
+            nog_ncurses - ncurses client with (sdl) sound
+            nog_ncurses_nososund - ncurses client without sound
+
+
+Playing:
+--------
+    While still in the nog dir
+
+    $./nog_srv 
+    This will start the server with the default settings. A server can accept connections from up to 4 clients at the same time.
+    You can tpye commands (see "Server commands")
+
+    In another terminal (which could be on another machine having the same program) cd to the nog dir:
+
+    $./nog_ncurses 
+        or if you are on a remote machine
+    $./nog_ncurses -s remote.server 
+        or if you do not want sound replace "nog_ncurses" with "nog_ncurses_nosound"
+
+    Press enter in the client's window to become ready. The game starts, when all connected players are ready.
+
+Server commands:
+----------------
+    start   - start a new game with the currently connected players
+    solve   - solve the puzzle, end the game
+    list    - list players connected
+    drop s  - drop player connected to socket number s 
+    time n  - set gametime to n seconds
+    quit    - quit
+
+Keys during gameplay:
+---------------------   
+                a..z - Move the first occurance of the letter to the end of the guess
+                1..7 - Move the letter in the nth position to the guess 
+               SPACE - Shuffle remaining letters
+               Enter - Check and erase guess 
+         Right arrow - Check guess, but do not erase it
+          Left arrow - Erase last letter from the guess
+           Backspace - Erase the whole guess without checking
+                 TAB - Give game up
+       ESC or CTRL-C - Exit
+
+Keys before gameplay:
+---------------------
+               Enter - become ready (if every connected player is ready, a game will start automatically)
+       ESC or CTRL-C - Exit
+
+Further options:
+----------------
+    Launch the binaries with the "-h" switch to see them all.
+
+
+
