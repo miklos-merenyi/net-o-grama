@@ -17,7 +17,7 @@ SDL2_MIXER_LIBS := $(shell pkg-config --libs SDL2_mixer 2>/dev/null || pkg-confi
 
 NCURSES_LIBS := $(shell pkg-config --libs ncursesw 2>/dev/null || echo -lncurses)
 
-all: nog_srv nog_ncurses nog_ncurses_nosound
+all: nog_srv nog_ncurses nog_ncurses_nosound nog_sdl
 
 nog_srv: debug.o nog_srv.o network.o engine.o dlb.o linked.o
 	$(CC) $(CFLAGS) -o ../nog_srv nog_srv.o debug.o network.o engine.o dlb.o linked.o $(GLIB_LFLAGS)
@@ -27,6 +27,9 @@ nog_ncurses : debug.o client.o nog_ncurses.o network.o linked.o dlb.o cli_ncurse
 
 nog_ncurses_nosound : debug.o client_nosound.o nog_ncurses_nosound.o network.o linked.o dlb.o cli_ncurses.o engine.o nog_ncurses_nosound.o
 	$(CC) $(CFLAGS) -o ../nog_ncurses_nosound nog_ncurses_nosound.o debug.o network.o linked.o dlb.o cli_ncurses.o engine.o client_nosound.o $(GLIB_LFLAGS) $(NCURSES_LIBS)
+
+nog_sdl : debug.o client.o nog_sdl.o network.o linked.o dlb.o cli_sdl.o engine.o sound.o
+	$(CC) $(CFLAGS) -o ../nog_sdl nog_sdl.o debug.o network.o linked.o dlb.o cli_sdl.o engine.o client.o sound.o $(SDL2_LIBS) $(SDL2_MIXER_LIBS) $(GLIB_LFLAGS)
 
 
 nog_srv.o : nog_srv.c
@@ -45,7 +48,7 @@ nog_ncurses_nosound.o: nog_ncurses_nosound.c
 	gcc $(LFLAGS) $(GLIB_CFLAGS) -c nog_ncurses_nosound.c
 
 nog_sdl.o: nog_sdl.c
-	gcc $(LFLAGS) $(GLIB_CFLAGS) -c nog_sdl.c
+	gcc $(LFLAGS) $(GLIB_CFLAGS) $(SDL2_CFLAGS) $(SDL2_MIXER_CFLAGS) -c nog_sdl.c
 
 
 debug.o: debug.c
@@ -67,7 +70,7 @@ cli_ncurses.o: cli_ncurses.c
 	gcc $(LFLAGS) -c cli_ncurses.c
 
 cli_sdl.o: cli_sdl.c 
-	gcc $(LFLAGS) -c cli_sdl.c
+	gcc $(LFLAGS) $(SDL2_CFLAGS) -c cli_sdl.c
 
 sprite.o: sprite.c
 	gcc $(LFLAGS) -c sprite.c 
@@ -77,7 +80,7 @@ sound.o: sound.c
 	
 
 clean:
-	-rm -f *.o nog_srv nog_ncurses *.log
+	-rm -f *.o nog_srv nog_ncurses nog_sdl nog_ncurses_nosound *.log
 	-rm -rf bcpp
 
 bcpp:
