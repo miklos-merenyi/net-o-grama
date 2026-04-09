@@ -106,12 +106,15 @@ void send2all(char* msg, ...)
 {
     struct player *pl1,*pl;
     va_list ap;
+    va_list ap_copy;
     int err;
     va_start(ap,msg);
     pl=player1;
     while(pl)
     {
-        err=vsendf(pl->foglalat,msg,ap);
+        va_copy(ap_copy,ap);
+        err=vsendf(pl->foglalat,msg,ap_copy);
+        va_end(ap_copy);
         pl1=pl;
         pl=pl->next;
         if (err)

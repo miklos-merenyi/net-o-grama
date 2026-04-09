@@ -19,11 +19,11 @@ int key_QUIT = 27;
 #define WINDOW_HEIGHT 720
 #define PLAY_X 20
 #define PLAY_Y 20
-#define PLAY_W 740
+#define PLAY_W 700
 #define PLAY_H 220
-#define SCORE_X 780
+#define SCORE_X 720
 #define SCORE_Y 20
-#define SCORE_W 220
+#define SCORE_W 304
 #define SCORE_H 220
 #define GUESS_X 20
 #define GUESS_Y 260
@@ -36,6 +36,14 @@ static char currentWord[16] = "";
 static char currentTry[16] = "";
 static int currentTime = 0;
 static struct node *currentHead = NULL;
+
+// Color palette for 4 players (matching ncurses colors)
+static SDL_Color playerColors[4] = {
+    {255, 0, 0, 255},     // Player 0: Red
+    {0, 255, 0, 255},     // Player 1: Green
+    {255, 255, 0, 255},   // Player 2: Yellow
+    {0, 255, 255, 255}    // Player 3: Cyan
+};
 
 static const uint8_t sdl_font[][8] = {
     {0x18,0x24,0x42,0x42,0x7E,0x42,0x42,0x42}, // A
@@ -147,15 +155,20 @@ static void renderScreen()
 
     char timeBuffer[16];
     snprintf(timeBuffer, sizeof(timeBuffer), "TIME:%3d", currentTime);
-    drawText(renderer, SCORE_X + 12, SCORE_Y + 18, timeBuffer, accent, 3);
+    drawText(renderer, SCORE_X + 10, SCORE_Y + 15, timeBuffer, accent, 2);
 
     for (int i = 0; i < nop; ++i)
     {
-        int y = SCORE_Y + 70 + i * 40;
-        drawText(renderer, SCORE_X + 12, y, gamers[i].name, text, 3);
+        int y = SCORE_Y + 15 + (i + 1) * 38;
+        SDL_Color playerColor = playerColors[i % 4];
+        char nameDisplay[9];
+        strncpy(nameDisplay, gamers[i].name, 9); 
+        nameDisplay[8] = '\0';
+        drawText(renderer, SCORE_X + 10, y, nameDisplay, playerColor, 2);
+        drawText(renderer, SCORE_X + 154, y, ":", playerColor, 2);
         char scoreText[16];
-        snprintf(scoreText, sizeof(scoreText), "%d", gamers[i].score);
-        drawText(renderer, SCORE_X + 12, y + 24, scoreText, accent, 3);
+        snprintf(scoreText, sizeof(scoreText), "%3d", gamers[i].score);
+        drawText(renderer, SCORE_X + 180, y, scoreText, playerColor, 2);
     }
 
     if (currentHead)
@@ -165,7 +178,7 @@ static void renderScreen()
         int row = 0;
         const int guessScale = 2;
         const int guessRowHeight = 26;
-        const int guessColWidth = 220;
+        const int guessColWidth = 160;
         const int maxRows = (GUESS_H - 20) / guessRowHeight;
 
         while (nod)
@@ -174,7 +187,8 @@ static void renderScreen()
             int y = GUESS_Y + row * guessRowHeight + 10;
             if (nod->guessed > 0)
             {
-                drawText(renderer, x, y, nod->anagram, text, guessScale);
+                SDL_Color guessColor = playerColors[(nod->guessed - 1) % 4];
+                drawText(renderer, x, y, nod->anagram, guessColor, guessScale);
             }
             else
             {
