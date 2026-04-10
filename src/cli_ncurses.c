@@ -374,7 +374,7 @@ void drawScoreBoard(int refr)
 {
     int i;
     if (useColors) wbkgd(scoreBoard,COLOR_PAIR(10));
-    wmove(scoreBoard,3,0);
+    wmove(scoreBoard,3,1);
     for (i=0;i<nop;i++)
     {
         if (useColors) wcolor_set(scoreBoard,i+11,NULL);
