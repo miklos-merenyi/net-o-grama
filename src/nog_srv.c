@@ -481,8 +481,13 @@ void recv_msg(struct player* peer)
                 break;
             case 'n':            //name: xyxyxy
             {
-                const char *name_start = &(msg[5]);
-                if (*name_start == ' ') name_start++;
+                const char *name_start = strchr(msg, ':');
+                if (name_start) {
+                    name_start++;
+                    while (*name_start == ' ') name_start++;
+                } else {
+                    name_start = msg + 1;
+                }
                 strncpy(peer->name, name_start, 8);
                 peer->name[8] = '\0';
                 echof(0,"Client on socket %d sets his/her name to %s\n",peer->foglalat,peer->name);
