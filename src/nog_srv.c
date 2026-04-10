@@ -479,11 +479,14 @@ void recv_msg(struct player* peer)
             case 'q':            //quit
                 removePlayer(peer);
                 break;
-            case 'n':            //name:xyxyxy
-                strncpy(peer->name,&(msg[5]),8);
-                // filter out ":"s !
-                peer->name[8]='\0';
-                echof(0,"Client on socket %d sets his/her name to %s\n",peer->foglalat,&msg[5]);
+            case 'n':            //name: xyxyxy
+            {
+                const char *name_start = &(msg[5]);
+                if (*name_start == ' ') name_start++;
+                strncpy(peer->name, name_start, 8);
+                peer->name[8] = '\0';
+                echof(0,"Client on socket %d sets his/her name to %s\n",peer->foglalat,peer->name);
+            }
                 break;
             case 'g':            //Guess from a player
                 echof(0,"Player %d (%s) guesses the word \"%s\"\n",peer->id,peer->name,&msg[2]);

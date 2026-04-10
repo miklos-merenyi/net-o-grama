@@ -18,6 +18,14 @@ from enum import Enum
 # Initialize Pygame
 pygame.init()
 
+# Sound support is optional; if the mixer fails or quiet mode is enabled, no audio is played.
+SOUND_ENABLED = True
+try:
+    pygame.mixer.init()
+except pygame.error:
+    print("Warning: audio disabled because mixer could not initialize")
+    SOUND_ENABLED = False
+
 # Set up constants matching SDL client
 WINDOW_WIDTH = 1024
 WINDOW_HEIGHT = 720
@@ -47,6 +55,44 @@ PANEL_COLOR = (22, 36, 56)
 BORDER_COLOR = (100, 170, 230)
 TEXT_COLOR = (240, 240, 240)
 ACCENT_COLOR = (200, 170, 90)
+
+# Load sounds
+sounds = {}
+sound_files = {
+    'click-answer': 'audio/click-answer.wav',
+    'click-shuffle': 'audio/click-shuffle.wav',
+    'found': 'audio/found.wav',
+    'found2': 'audio/found2.wav',
+    'badword': 'audio/badword.wav',
+    'clear': 'audio/clearword.wav',
+    'shuffle': 'audio/shuffle.wav',
+    'clock-tick': 'audio/clock-tick.wav',
+    'duplicate': 'audio/duplicate.wav',
+    'foundbig': 'audio/foundbig.wav'
+}
+
+def load_sound(path):
+    if not SOUND_ENABLED:
+        return None
+    try:
+        return pygame.mixer.Sound(path)
+    except (pygame.error, FileNotFoundError):
+        print(f"Warning: Could not load sound {path}")
+        return None
+
+for name, path in sound_files.items():
+    sounds[name] = load_sound(path)
+
+
+def play_sound(name):
+    if not SOUND_ENABLED:
+        return
+    sound = sounds.get(name)
+    if sound:
+        try:
+            sound.play()
+        except pygame.error:
+            pass
 
 # Game states
 class GameState(Enum):
@@ -229,9 +275,10 @@ class GameClient:
                 self.state = GameState.GETNODES
             else:
                 if self.nop < 4:
-                    self.gamers.append({'name': msg[:8], 'score': 0, 'state': 1})
+                    name = msg.strip()
+                    self.gamers.append({'name': name[:8], 'score': 0, 'state': 1})
                     self.nop += 1
-                    print(f"Got player: {msg[:8]}")
+                    print(f"Got player: {name[:8]}")
         
         elif self.state == GameState.GETNODES:
             if msg[0] == '.':
@@ -275,6 +322,7 @@ class GameClient:
                 return
             else:
                 self.update_play_field(msg, "      ")
+                play_sound('clock-tick')
                 return
         
         elif self.state in (GameState.GAMEISON, GameState.WAITING):
@@ -298,13 +346,19 @@ class GameClient:
                     if gid == self.my_id:
                         self.clear_answer()
                         self.del_answer = 1
+                        play_sound('found')
+                    else:
+                        play_sound('found2')
             elif msg[0] == 'F':
                 print("Guess failed, clearing answer")
                 self.clear_answer()
+                play_sound('badword')
             elif msg[0] == 'T':
                 try:
                     time_val = int(msg[2:])
                     self.current_time = time_val
+                    if time_val <= 10:
+                        play_sound('clock-tick')
                 except:
                     pass
             elif msg[0] == 'E':
@@ -387,6 +441,7 @@ class GameClient:
                 print("Shuffling letters")
                 self.rem = self.shuffle_string(self.rem)
                 self.update_play_field(self.rem, self.answer)
+                play_sound('shuffle')
             
             elif key in (key_CHECK_NORET, key_CHECK):
                 self.del_answer = (key == key_CHECK)
@@ -394,6 +449,7 @@ class GameClient:
                     print(f"Sending guess: {self.answer}")
                     self.send_message(f"g:{self.answer}")
                     self.state = GameState.WAITING
+                    play_sound('click-answer')
                 else:
                     print("No answer to submit")
             
@@ -401,6 +457,7 @@ class GameClient:
                 print("Clearing answer")
                 self.del_answer = 1
                 self.clear_answer()
+                play_sound('clear')
             
             elif key == key_DELCHAR:
                 print("Deleting last character")
@@ -509,7 +566,7 @@ def render_screen(surface):
         score = client.gamers[i]['score'] if i < len(client.gamers) else 0
 
         draw_text(surface, SCORE_X + 10, y, name, player_color, 2)
-        draw_text(surface, SCORE_X + 154, y, ":", player_color, 2)
+        draw_text(surface, SCORE_X + 162, y, ":", player_color, 2)
         draw_text(surface, SCORE_X + 180, y, f"{score:3d}", player_color, 2)
 
     if client.head:
@@ -652,8 +709,13 @@ def main():
     parser.add_argument('-s', '--server', default='localhost', help='Server address')
     parser.add_argument('-p', '--port', type=int, default=PORT, help=f'Server port (default: {PORT})')
     parser.add_argument('-n', '--name', default='player', help='Player nickname')
+    parser.add_argument('-q', '--quiet', action='store_true', help='Disable sound effects')
     
     args = parser.parse_args()
+    
+    global SOUND_ENABLED
+    if args.quiet:
+        SOUND_ENABLED = False
     
     client = GameClient(username=args.name, server=args.server, port=args.port)
     

@@ -162,7 +162,9 @@ static void renderScreen()
         int y = SCORE_Y + 15 + (i + 1) * 38;
         SDL_Color playerColor = playerColors[i % 4];
         char nameDisplay[9];
-        strncpy(nameDisplay, gamers[i].name, 9); 
+        const char *nameStart = gamers[i].name;
+        while (*nameStart == ' ' && *nameStart != '\0') nameStart++;
+        strncpy(nameDisplay, nameStart, 8);
         nameDisplay[8] = '\0';
         drawText(renderer, SCORE_X + 10, y, nameDisplay, playerColor, 2);
         drawText(renderer, SCORE_X + 154, y, ":", playerColor, 2);
