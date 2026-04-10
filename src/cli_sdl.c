@@ -23,7 +23,7 @@ int key_QUIT = 27;
 #define PLAY_H 220
 #define SCORE_X 720
 #define SCORE_Y 20
-#define SCORE_W 304
+#define SCORE_W 280
 #define SCORE_H 220
 #define GUESS_X 20
 #define GUESS_Y 260
