@@ -243,15 +243,12 @@ void recv_msg()
                 {
                     gamers[nop].state=1;
                     gamers[nop].score=0;
-                    // Trim leading spaces from name
-                    char trimmed[9];
-                    int i = 0;
-                    while (i < 8 && msg[i] == ' ') i++;
-                    int j = 0;
-                    while (i < 8 && j < 8) {
-                        trimmed[j++] = msg[i++];
-                    }
-                    trimmed[j] = '\0';
+                    // Trim leading spaces from name while preserving the first actual character
+                    int offset = 0;
+                    while (offset < 8 && msg[offset] == ' ') offset++;
+                    char trimmed[9] = {0};
+                    strncpy(trimmed, msg + offset, 8);
+                    trimmed[8] = '\0';
                     strncpy(gamers[nop].name, trimmed, 8);
                     gamers[nop].name[8] = '\0';
                     debug(0,"Got the name of the next player: %s\n",gamers[nop].name);
