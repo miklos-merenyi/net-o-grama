@@ -62,4 +62,4 @@ nog*
 
 core*
 .vscode/*
-
+.venv/*
