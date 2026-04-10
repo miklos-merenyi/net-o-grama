@@ -14,17 +14,29 @@
 #include <ncurses.h>
 #include <signal.h>
 #include <glib.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_mixer.h>
 #include "client.h"
 #include "cli_ncurses.h"
 #include "network.h"
+
+/* Conditionally include sound support */
+#ifdef HAVE_SDL2_MIXER
+#include <SDL2/SDL_mixer.h>
 #include "sound.h"
+#endif
+
 #define PROGNAME "nog_ncurses"
 #define DESC "A terminal based NET-O-GRAMA game client."
 
 int debugLevel=10;
 char *logfile="/dev/null";
+int disableSound=0;
+
+#ifndef HAVE_SDL2_MIXER
+/* No-op sound functions when SDL2_mixer is not available */
+int initSound(void) { return 0; }
+int endSound(void) { return 0; }
+Mix_Chunk* getSound(char* name) { return NULL; }
+#endif
 
 int main(int argc, char* argv[])
 {
@@ -36,7 +48,7 @@ int main(int argc, char* argv[])
     }
 
     GError *error = NULL;
-    static GOptionEntry entries[6];
+    static GOptionEntry entries[7];
 
     gchar * port_text;
     gchar * logfile_text;
@@ -76,7 +88,13 @@ int main(int argc, char* argv[])
     {
         "logfile", 'l', 0, G_OPTION_ARG_FILENAME, &logfile, logfile_text, "file"
     } ;
-    entries[5]=( GOptionEntry ) {NULL};
+
+    entries[5]=( GOptionEntry)
+    {
+        "quiet", 'q', 0, G_OPTION_ARG_NONE, &disableSound, "Disable sound output.", NULL
+    };
+
+    entries[6]=( GOptionEntry ) {NULL};
     context = g_option_context_new (NULL);
 
     g_option_context_add_main_entries(context, entries,PROGNAME);
@@ -100,11 +118,25 @@ int main(int argc, char* argv[])
     initLogfile(logfile);
     initConnection(srvname,port);
     initScreen();
-    initSound();
-    Mix_PlayChannel(-1, getSound("foundbig"), 0);
+
+    /* Initialize sound only if available and not disabled */
+#ifdef HAVE_SDL2_MIXER
+    if (!disableSound) {
+        initSound();
+        Mix_PlayChannel(-1, getSound("foundbig"), 0);
+    }
+#endif
+
     displayMessage("welcome",usrname);
     gameLoop();
-    endSound();
+
+    /* Cleanup sound if it was initialized */
+#ifdef HAVE_SDL2_MIXER
+    if (!disableSound) {
+        endSound();
+    }
+#endif
+
     endScreen();
     close(srv);
     closeLogfile();

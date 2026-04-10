@@ -16,7 +16,10 @@
 #include "debug.h"
 #include "linked.h"
 #include "network.h"
+#ifdef HAVE_SDL2_MIXER
 #include "sound.h"
+extern int disableSound;
+#endif
 #include "engine.h"
 
 extern int key_SHUFFLE;
@@ -302,7 +305,9 @@ void recv_msg()
                 }
                 strcpy(word,msg);
                 displayMessage(word,"      ");
-                Mix_PlayChannel(-1, getSound("clock-tick"), 0);
+#ifdef HAVE_SDL2_MIXER
+                if (!disableSound) Mix_PlayChannel(-1, getSound("clock-tick"), 0);
+#endif
                 break;
 
             case GAMEISON:
@@ -327,12 +332,16 @@ void recv_msg()
                         if (gid==id)//it was ME.. make some music here...
                         {
                             clearAnswer();
-                            Mix_PlayChannel(-1, getSound("found"), 0);
+#ifdef HAVE_SDL2_MIXER
+                            if (!disableSound) Mix_PlayChannel(-1, getSound("found"), 0);
+#endif
                             delAnswer=1;
                         }
                         else
                         {
-                            Mix_PlayChannel(-1, getSound("found2"), 0);
+#ifdef HAVE_SDL2_MIXER
+                            if (!disableSound) Mix_PlayChannel(-1, getSound("found2"), 0);
+#endif
                         }
                         drawScoreBoard(1);
                         nod=head;
@@ -349,7 +358,9 @@ void recv_msg()
                         drawGuessBoard(head,1);
                         break;
                     case 'F':    //my last guess has failed
-                        Mix_PlayChannel(-1, getSound("badword"), 0);
+#ifdef HAVE_SDL2_MIXER
+                        if (!disableSound) Mix_PlayChannel(-1, getSound("badword"), 0);
+#endif
                         clearAnswer();
                         break;
                     case 'T' :   //set time
@@ -357,7 +368,9 @@ void recv_msg()
                         nextWord(tmpstr,msg,&pos);
                         gameTime=atoi(tmpstr);
                         updateTime(gameTime);
-                        if (gameTime<=10) { Mix_PlayChannel(-1, getSound("clock-tick"), 0);}
+#ifdef HAVE_SDL2_MIXER
+                        if (gameTime<=10 && !disableSound) { Mix_PlayChannel(-1, getSound("clock-tick"), 0);}
+#endif
                         break;
                     case 'E' :   //game ended
                         state=ENDED;
