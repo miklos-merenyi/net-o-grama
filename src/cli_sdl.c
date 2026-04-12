@@ -107,7 +107,7 @@ static void renderScreen()
 
     char timeBuffer[16];
     snprintf(timeBuffer, sizeof(timeBuffer), "TIME:%3d", currentTime);
-    drawText(renderer, SCORE_X + 10, SCORE_Y + 15, timeBuffer, accent, 120);  // 120% scale
+    drawText(renderer, SCORE_X + 10, SCORE_Y + 15, timeBuffer, accent, 90);  // 90% scale - smaller
 
     for (int i = 0; i < nop; ++i)
     {
@@ -118,11 +118,11 @@ static void renderScreen()
         while (*nameStart == ' ' && *nameStart != '\0') nameStart++;
         strncpy(nameDisplay, nameStart, 8);
         nameDisplay[8] = '\0';
-        drawText(renderer, SCORE_X + 10, y, nameDisplay, playerColor, 120);
-        drawText(renderer, SCORE_X + 154, y, ":", playerColor, 120);
+        drawText(renderer, SCORE_X + 10, y, nameDisplay, playerColor, 90);
+        drawText(renderer, SCORE_X + 154, y, ":", playerColor, 90);
         char scoreText[16];
         snprintf(scoreText, sizeof(scoreText), "%3d", gamers[i].score);
-        drawText(renderer, SCORE_X + 180, y, scoreText, playerColor, 120);
+        drawText(renderer, SCORE_X + 180, y, scoreText, playerColor, 90);
     }
 
     if (currentHead)
@@ -130,7 +130,7 @@ static void renderScreen()
         const struct node *nod = currentHead;
         int col = 0;
         int row = 0;
-        const int guessScale = 120;  // 120% scale (percentage format)
+        const int guessScale = 90;  // 90% scale (percentage format) - smaller
         const int guessRowHeight = 26;
         const int guessColWidth = 160;
         const int maxRows = (GUESS_H - 20) / guessRowHeight;
@@ -196,26 +196,26 @@ void initScreen()
         exit(1);
     }
     
-    // Load a system font for UTF-8 support (DejaVuSans supports Hungarian characters)
-    // Using larger base font size to render at good quality with scaling
-    font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 42);
+    // Load a fixed-width (monospace) font for proper text alignment
+    // DejaVuSansMono and LiberationMono support UTF-8 and Hungarian characters
+    font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 28);
     if (!font)
     {
-        font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 42);
+        font = TTF_OpenFont("/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf", 28);
     }
     if (!font)
     {
-        // Try alternative paths
-        font = TTF_OpenFont("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 40);
+        // Try alternative monospace fonts
+        font = TTF_OpenFont("/usr/share/fonts/truetype/courier/courR8092.ttf", 28);
     }
     if (!font)
     {
-        font = TTF_OpenFont("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 40);
+        font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 26);
     }
     if (!font)
     {
-        // Fall back to any available monospace font
-        font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 38);
+        // Fall back to proportional fonts if monospace unavailable
+        font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 26);
     }
     if (!font)
     {
