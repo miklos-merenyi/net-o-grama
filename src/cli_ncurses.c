@@ -311,54 +311,107 @@ void outline(WINDOW* win,char shadow, char outbyte)
 
 // Helper function to convert Hungarian UTF-8 characters to their ASCII base
 // This allows block fonts to render close approximations
-static unsigned char utf8_to_ascii(unsigned char byte1, unsigned char byte2)
+static unsigned char utf8_to_accent(unsigned char byte1, unsigned char byte2)
 {
-    // Hungarian UTF-8 characters with 0xC3 as first byte (U+00xx range)
+    // Map UTF-8 accented characters to extended ASCII codes for bitmap display
+    // Using character codes that represent accented variants in the charset
+    
     if (byte1 == 0xC3) {
+        // Latin-1 supplement (U+00C0-U+00FF)
         switch(byte2) {
-            case 0xA9: return 'e';  // é -> e
-            case 0xA8: return 'e';  // è -> e
-            case 0xAA: return 'e';  // ê -> e
-            case 0xAB: return 'e';  // ë -> e
-            case 0xAD: return 'i';  // í -> i
-            case 0xAC: return 'i';  // ì -> i
-            case 0xAE: return 'i';  // î -> i
-            case 0xAF: return 'i';  // ï -> i
-            case 0xA1: return 'a';  // á -> a
-            case 0xA0: return 'a';  // à -> a
-            case 0xA2: return 'a';  // â -> a
-            case 0xA3: return 'a';  // ã -> a
-            case 0xA4: return 'a';  // ä -> a
-            case 0xB3: return 'o';  // ó -> o
-            case 0xB2: return 'o';  // ò -> o
-            case 0xB4: return 'o';  // ô -> o
-            case 0xB5: return 'o';  // õ -> o
-            case 0xB6: return 'o';  // ö -> o
-            case 0xBA: return 'u';  // ú -> u
-            case 0xB9: return 'u';  // ù -> u
-            case 0xBB: return 'u';  // û -> u
-            case 0xBC: return 'u';  // ü -> u
-            default: return '?';
+            // Lowercase accented characters
+            case 0xA1: return 160;  // á -> char 160
+            case 0xA9: return 130;  // é -> char 130
+            case 0xAD: return 161;  // í -> char 161
+            case 0xB3: return 162;  // ó -> char 162
+            case 0xBA: return 163;  // ú -> char 163
+            case 0xB6: return 148;  // ö -> char 148
+            case 0xBC: return 129;  // ü -> char 129
+            
+            // Uppercase - fall back to lowercase for now
+            case 0x81: return 160;  // Á
+            case 0x89: return 130;  // É
+            case 0x8D: return 161;  // Í
+            case 0x93: return 162;  // Ó
+            case 0x9A: return 163;  // Ú
+            case 0x96: return 148;  // Ö
+            case 0x9C: return 129;  // Ü
+            
+            default: return 'a';  // Safe fallback
         }
     }
     // Hungarian UTF-8 characters with 0xC5 as first byte (U+01xx range)
     if (byte1 == 0xC5) {
         switch(byte2) {
-            case 0xB1: return 'u';  // ű -> u
-            case 0x91: return 'o';  // ő -> o
-            default: return '?';
+            case 0xB1: return 163;  // ű -> u variant
+            case 0x91: return 162;  // ő -> o variant
+            default: return 'a';
         }
     }
-    return '?';
+    return 'a';
 }
+
 
 void blWord(WINDOW* win,char *str,char shadow)
 {
-    // Use native ncurses UTF-8 support instead of bitmap font
-    // This preserves accented characters like é, ó, ű, etc.
+    unsigned char ch;
+    int ch_off;
+    unsigned char *ch_addr;
+    unsigned char *font;
+    int linenum,chnum;
+    char outstr[7]="       ";
+    int i = 0;
+    int outpos = 0;
     
-    // Simply display the string as-is, ncurses will handle UTF-8
-    waddstr(win, str);
+    // Convert UTF-8 string to displayable characters, preserving accents
+    while (i < (int)strlen(str) && outpos < 7)
+    {
+        unsigned char byte1 = (unsigned char)str[i];
+        
+        // Check for UTF-8 multi-byte character
+        if (byte1 >= 0xC0 && byte1 <= 0xC5 && i + 1 < (int)strlen(str))
+        {
+            unsigned char byte2 = (unsigned char)str[i+1];
+            
+            // Check if this is a valid UTF-8 continuation byte
+            if ((byte2 & 0xC0) == 0x80)
+            {
+                // Convert to appropriate character code for bitmap rendering
+                outstr[outpos++] = utf8_to_accent(byte1, byte2);
+                i += 2;  // Skip both bytes
+                continue;
+            }
+        }
+        
+        // Regular ASCII character
+        if (byte1 >= 32 && byte1 <= 126)
+        {
+            outstr[outpos++] = byte1;
+        }
+        else
+        {
+            outstr[outpos++] = ' ';  // Convert non-printable to space
+        }
+        i++;
+    }
+    
+    // Pad with spaces
+    while (outpos < 7)
+    {
+        outstr[outpos++] = ' ';
+    }
+    
+    font=(unsigned char *)&charset;
+    for (linenum = 0; linenum < 8; linenum++)
+    {
+        for (chnum = 0; chnum < 7; chnum++)
+        {
+            ch = outstr[chnum] - (32 * (outstr[chnum] >= 97 && outstr[chnum] <= 122));
+            ch_off = (int)ch * 8;
+            ch_addr = font + ch_off + linenum;
+            outline(win, shadow, *ch_addr);
+        }
+    }
 }
 
 
