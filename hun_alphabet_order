@@ -1,0 +1,1 @@
+python3 -c "import sys; h='aábcdeéfghiíjklmnoóöőpqrstuvwxyuz'; o={c:i for i,c in enumerate(h)}; sys.stdout.writelines(sorted(sys.stdin, key=lambda w: [o.get(c.lower(), ord(c)) for c in w]))" < wordlist.hu > wordlist.hu1

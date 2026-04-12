@@ -354,64 +354,11 @@ static unsigned char utf8_to_ascii(unsigned char byte1, unsigned char byte2)
 
 void blWord(WINDOW* win,char *str,char shadow)
 {
-    unsigned char ch;
-    int ch_off;
-    unsigned char *ch_addr;
-    unsigned char *font;
-    int linenum,chnum;
-    char outstr[7]="       ";
-    int i = 0;
-    int outpos = 0;
+    // Use native ncurses UTF-8 support instead of bitmap font
+    // This preserves accented characters like é, ó, ű, etc.
     
-    // Convert UTF-8 string to ASCII equivalent for block font display
-    while (i < (int)strlen(str) && outpos < 7)
-    {
-        unsigned char byte1 = (unsigned char)str[i];
-        
-        // Check for UTF-8 multi-byte character
-        if (byte1 >= 0xC0 && byte1 <= 0xC5 && i + 1 < (int)strlen(str))
-        {
-            unsigned char byte2 = (unsigned char)str[i+1];
-            
-            // Check if this is a valid UTF-8 continuation byte
-            if ((byte2 & 0xC0) == 0x80)
-            {
-                // Convert to ASCII base character
-                outstr[outpos++] = utf8_to_ascii(byte1, byte2);
-                i += 2;  // Skip both bytes
-                continue;
-            }
-        }
-        
-        // Regular ASCII character
-        if (byte1 >= 32 && byte1 <= 126)
-        {
-            outstr[outpos++] = byte1;
-        }
-        else
-        {
-            outstr[outpos++] = ' ';  // Convert non-printable to space
-        }
-        i++;
-    }
-    
-    // Pad with spaces
-    while (outpos < 7)
-    {
-        outstr[outpos++] = ' ';
-    }
-    
-    font=(unsigned char *)&charset;
-    for (linenum = 0; linenum < 8; linenum++)
-    {
-        for (chnum = 0; chnum < 7; chnum++)
-        {
-            ch = outstr[chnum] - (32 * (outstr[chnum] >= 97 && outstr[chnum] <= 122));
-            ch_off = (int)ch * 8;
-            ch_addr = font + ch_off + linenum;
-            outline(win, shadow, *ch_addr);
-        }
-    }
+    // Simply display the string as-is, ncurses will handle UTF-8
+    waddstr(win, str);
 }
 
 

@@ -41,7 +41,7 @@ int utf8_strlen(const char* str)
 //module level variables for game control
 extern struct node* head;
 struct dlb_node* dlbHead;
-extern char rootWord[10];
+extern char rootWord[65];  // Increased from 10 to match getRandomWord() output
 char *wordlist = NULL;  // Wordlist filename, initialized by main()
 char spc=' '+32;
 __attribute__((constructor)) static void set_utf8_locale() {
@@ -328,11 +328,22 @@ char* ag(char* guess, char* remain)
 
     //debug(0,"%s\n", newGuess);
 
-    if(utf8_strlen(newGuess) > 3)
+    int newGuessLen = utf8_strlen(newGuess);
+    
+    if(newGuessLen > 3)
     {
         if (dlb_lookup(dlbHead,shiftLeftKill(newGuess)))
         {
             push(&head, shiftLeftKill(newGuess));
+        }
+    }
+    
+    // Also check for full-length 7-letter words (including root word and its anagrams)
+    if(newGuessLen == 7)
+    {
+        if (dlb_lookup(dlbHead, newGuess))
+        {
+            push(&head, newGuess);
         }
     }
 
@@ -474,14 +485,23 @@ char* getRandomWord()
     char* wordFromList = malloc(sizeof(char) * 50);
     int len;
     int done = 0;
-    filelocation = rand()%1000;
-
+    int lineCount = 0;
+    
     FILE* wfile;
     if ((wfile=fopen(wordlist,"r"))==NULL )
     {
         error(1,errno,"Can't open wordlist file");
     }
-
+    
+    // First pass: count total lines in wordlist
+    char tempWord[50];
+    while (fscanf(wfile, "%49s", tempWord) != EOF) {
+        lineCount++;
+    }
+    rewind(wfile);  // Reset file pointer to beginning
+    
+    // Now use actual wordlist size for random selection
+    filelocation = rand() % lineCount;
 
     for (i=0;i<=filelocation;i++)
     {
@@ -492,8 +512,7 @@ char* getRandomWord()
         else
         {
             // go back to the start of the file
-            fclose(wfile);
-            wfile=fopen(wordlist, "r");
+            rewind(wfile);
         }
     }
 
@@ -515,21 +534,13 @@ char* getRandomWord()
             else
             {
                 // go back to the start of the file
-                fclose(wfile);
-                wfile=fopen(wordlist, "r");
+                rewind(wfile);
                 fscanf(wfile, "%49s", wordFromList);  // FIXED: Added size limit
             }
         }
     }
 
     fclose(wfile);
-
-    // add in our space character at the end of the word (after all bytes)
-    int byte_len = strlen(wordFromList);  // Get actual byte length
-    if (byte_len < 49) {  // Safety check before adding space
-        wordFromList[byte_len] = ' ';
-        wordFromList[byte_len+1] = '\0';
-    }
 
     return wordFromList;
     free(wordFromList);
@@ -614,56 +625,30 @@ void newGame()
     do
     {
         strcpy(guess,"\0");
-        debug(2,"rootWord: %s\n",getRandomWord());
         strcpy(rootWord, getRandomWord());
         
-        // Calculate word length in characters, then find byte position of last char to remove
+        // Calculate word length in characters
         size_t wordlen = utf8_strlen(rootWord);
         if (wordlen == 0) continue;  // Safety: skip empty words
         
-        bigWordLen = wordlen - 1;  // bigWordLen now stores CHARACTER count
-        
-        // Find byte position where the last character starts
-        int byte_len = utf8_char_to_bytes(rootWord, bigWordLen);
-        if (byte_len >= 49) byte_len = 48;  // Bounds check
+        bigWordLen = wordlen;  // Use full word length, not wordlen - 1
         
         strcpy(remain,rootWord);
-        rootWord[byte_len] = '\0';  // Truncate at the byte boundary of the last character
-        remain[byte_len] = '\0';    // ALSO truncate remain to match
         
         destroyAnswers(&head);
         debug(2,"generate anagrams from random word \n");
         ag(guess, remain);
+        
+        // Always add the root word itself to the anagrams list
+        push(&head, rootWord);
+        
         sort(&head);
         answersSought = Length(head);
         debug(2,"rootWord: %s, answers:%d\n",rootWord,Length(head));
     }
     while( (answersSought > 80) | (answersSought < 6));
 
-    // Fill remain buffer with spaces for remaining character positions
-    // bigWordLen is CHARACTER count of root word (without last char)
-    // remain is now truncated to bigWordLen characters
-    // We need to fill character positions [bigWordLen] through [lettersNum-1] with spaces
-    
-    // Calculate byte position where remaining character ends (end of string)
-    int first_space_byte = strlen(remain);  // Get actual byte length after truncation
-    if (first_space_byte >= 48) {  // Safety check
-        free(guess);
-        free(remain);
-        return;
-    }
-    
-    // Pad with spaces to make lettersNum total characters (in bytes)
-    int current_char = bigWordLen;
-    int byte_idx = first_space_byte;
-    
-    while (current_char < lettersNum && byte_idx < 47) {  // Extra safety: < 47 instead of < 48
-        remain[byte_idx] = ' ';
-        byte_idx++;
-        current_char++;
-    }
-    if (byte_idx < 48) remain[byte_idx] = '\0';  // Final null terminator, with bounds check
-
+    // No padding needed - we're using the full 7-letter word
     // Shuffle and process
     shuffleString(remain);
     sort(&head);

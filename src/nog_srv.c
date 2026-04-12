@@ -51,7 +51,7 @@ struct player
 
 struct player* player1=NULL;     // the head of the list of the players
 struct node* head=NULL;
-char rootWord[10];
+char rootWord[65];  // Increased from 10 to match getRandomWord() output
 int foglalat;
 
 extern char *wordlist;  // Defined in engine.c
