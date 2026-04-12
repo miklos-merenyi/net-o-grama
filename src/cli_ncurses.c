@@ -406,7 +406,7 @@ void blWord(WINDOW* win,char *str,char shadow)
     {
         for (chnum = 0; chnum < 7; chnum++)
         {
-            ch = outstr[chnum] - (32 * (outstr[chnum] >= 97 && outstr[chnum] <= 122));
+            ch = outstr[chnum] + (32 * (outstr[chnum] >= 65 && outstr[chnum] <= 90));
             ch_off = (int)ch * 8;
             ch_addr = font + ch_off + linenum;
             outline(win, shadow, *ch_addr);
