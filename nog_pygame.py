@@ -42,6 +42,35 @@ GUESS_Y = 260
 GUESS_W = 980
 GUESS_H = 440
 
+# TrueType font for UTF-8 support
+font = None
+
+def init_font():
+    """Initialize TrueType font for proper UTF-8 and Hungarian character support."""
+    global font
+    # Try monospace fonts in order of preference
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+        "/usr/share/fonts/truetype/courier/courR8092.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    
+    for font_path in font_paths:
+        try:
+            if os.path.exists(font_path):
+                font = pygame.font.Font(font_path, 28)
+                print(f"Loaded font: {font_path}")
+                return font
+        except pygame.error:
+            continue
+    
+    # Fallback to system font if no TTF found
+    print("Warning: Could not load TrueType font, using system font")
+    font = pygame.font.SysFont('monospace', 28)
+    return font
+
 # Color palette for 4 players (matching ncurses colors)
 PLAYER_COLORS = [
     (255, 0, 0),       # Player 0: Red
@@ -125,49 +154,17 @@ key_DELCHAR = pygame.K_LEFT
 key_SOLVE = '\t'
 key_QUIT = 27  # ESC
 
-# Bitmap font data - 8x8 characters
-BITMAP_FONT = {
-    'A': [0x18,0x24,0x42,0x42,0x7E,0x42,0x42,0x42],
-    'B': [0x7C,0x42,0x42,0x7C,0x42,0x42,0x42,0x7C],
-    'C': [0x3C,0x42,0x40,0x40,0x40,0x40,0x42,0x3C],
-    'D': [0x78,0x44,0x42,0x42,0x42,0x42,0x44,0x78],
-    'E': [0x7E,0x40,0x40,0x7C,0x40,0x40,0x40,0x7E],
-    'F': [0x7E,0x40,0x40,0x7C,0x40,0x40,0x40,0x40],
-    'G': [0x3C,0x42,0x40,0x4E,0x42,0x42,0x42,0x3C],
-    'H': [0x42,0x42,0x42,0x7E,0x42,0x42,0x42,0x42],
-    'I': [0x3C,0x18,0x18,0x18,0x18,0x18,0x18,0x3C],
-    'J': [0x1E,0x08,0x08,0x08,0x08,0x48,0x48,0x30],
-    'K': [0x42,0x44,0x48,0x70,0x48,0x44,0x42,0x42],
-    'L': [0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x7E],
-    'M': [0x42,0x66,0x5A,0x5A,0x42,0x42,0x42,0x42],
-    'N': [0x42,0x62,0x52,0x4A,0x46,0x42,0x42,0x42],
-    'O': [0x3C,0x42,0x42,0x42,0x42,0x42,0x42,0x3C],
-    'P': [0x7C,0x42,0x42,0x7C,0x40,0x40,0x40,0x40],
-    'Q': [0x3C,0x42,0x42,0x42,0x42,0x4A,0x44,0x3A],
-    'R': [0x7C,0x42,0x42,0x7C,0x48,0x44,0x42,0x42],
-    'S': [0x3C,0x42,0x40,0x3C,0x02,0x02,0x42,0x3C],
-    'T': [0x7E,0x18,0x18,0x18,0x18,0x18,0x18,0x18],
-    'U': [0x42,0x42,0x42,0x42,0x42,0x42,0x42,0x3C],
-    'V': [0x42,0x42,0x42,0x42,0x42,0x42,0x24,0x18],
-    'W': [0x42,0x42,0x42,0x42,0x5A,0x5A,0x66,0x42],
-    'X': [0x42,0x42,0x24,0x18,0x18,0x24,0x42,0x42],
-    'Y': [0x42,0x42,0x42,0x24,0x18,0x18,0x18,0x18],
-    'Z': [0x7E,0x02,0x04,0x08,0x10,0x20,0x40,0x7E],
-    '0': [0x3C,0x42,0x62,0x52,0x4A,0x46,0x42,0x3C],
-    '1': [0x18,0x38,0x18,0x18,0x18,0x18,0x18,0x3C],
-    '2': [0x3C,0x42,0x02,0x04,0x08,0x10,0x20,0x7E],
-    '3': [0x3C,0x42,0x02,0x1C,0x02,0x02,0x42,0x3C],
-    '4': [0x04,0x0C,0x14,0x24,0x44,0x7E,0x04,0x04],
-    '5': [0x7E,0x40,0x40,0x7C,0x02,0x02,0x42,0x3C],
-    '6': [0x3C,0x40,0x40,0x7C,0x42,0x42,0x42,0x3C],
-    '7': [0x7E,0x02,0x04,0x08,0x10,0x10,0x10,0x10],
-    '8': [0x3C,0x42,0x42,0x3C,0x42,0x42,0x42,0x3C],
-    '9': [0x3C,0x42,0x42,0x42,0x3E,0x02,0x02,0x3C],
-    ':': [0x00,0x18,0x18,0x00,0x00,0x18,0x18,0x00],
-    '-': [0x00,0x00,0x00,0x7E,0x00,0x00,0x00,0x00],
-    '.': [0x00,0x00,0x00,0x00,0x00,0x18,0x18,0x00],
-    ' ': [0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00],
-}
+# UTF-8 character count function
+def utf8_strlen(s):
+    """Count UTF-8 characters (not bytes)."""
+    count = 0
+    for byte in s.encode('utf-8'):
+        # Count each character start (ASCII or multi-byte start)
+        # ASCII: 0xxxxxxx
+        # Multi-byte start: 11xxxxxx
+        if (byte & 0x80) == 0 or (byte & 0xC0) == 0xC0:
+            count += 1
+    return count
 
 # Global game state
 class GameClient:
@@ -507,29 +504,28 @@ class GameClient:
 client = None
 
 
-def get_glyph(c):
-    """Get bitmap data for a character."""
-    key = c.upper()
-    if key in BITMAP_FONT:
-        return BITMAP_FONT[key]
-    return BITMAP_FONT[' ']
-
-
-def draw_text(surface, x, y, text, color, scale=2):
-    """Draw text using bitmap font."""
-    for i, char in enumerate(text):
-        glyph = get_glyph(char)
-        for row in range(8):
-            for col in range(8):
-                if glyph[row] & (1 << (7 - col)):
-                    rect = pygame.Rect(
-                        x + col * scale,
-                        y + row * scale,
-                        scale,
-                        scale
-                    )
-                    pygame.draw.rect(surface, color, rect)
-        x += (8 + 1) * scale
+def draw_text(surface, x, y, text, color, scale=100):
+    """Draw text using TrueType font with percentage-based scaling.
+    
+    scale: percentage where 100 = normal size, 150 = 1.5x, 90 = 0.9x
+    """
+    if font is None:
+        return
+    
+    # Calculate actual font size based on percentage
+    actual_size = int(20 * scale / 100)
+    if actual_size < 8:
+        actual_size = 8
+    
+    # Create font at the desired size
+    try:
+        temp_font = pygame.font.Font(font, actual_size)
+    except:
+        temp_font = pygame.font.Font(None, actual_size)
+    
+    # Render the text surface
+    text_surface = temp_font.render(text, True, color)
+    surface.blit(text_surface, (x, y))
 
 
 def draw_panel(surface, rect, bg_color, border_color):
@@ -553,11 +549,11 @@ def render_screen(surface):
     draw_panel(surface, score_rect, PANEL_COLOR, BORDER_COLOR)
     draw_panel(surface, guess_rect, PANEL_COLOR, BORDER_COLOR)
 
-    draw_text(surface, PLAY_X + 16, PLAY_Y + 18, client.current_word, TEXT_COLOR, 5)
-    draw_text(surface, PLAY_X + 16, PLAY_Y + 120, client.current_try, ACCENT_COLOR, 5)
+    draw_text(surface, PLAY_X + 16, PLAY_Y + 18, client.current_word, TEXT_COLOR, 150)
+    draw_text(surface, PLAY_X + 16, PLAY_Y + 120, client.current_try, ACCENT_COLOR, 150)
 
     time_buffer = f"TIME:{client.current_time:3d}"
-    draw_text(surface, SCORE_X + 10, SCORE_Y + 15, time_buffer, ACCENT_COLOR, 2)
+    draw_text(surface, SCORE_X + 10, SCORE_Y + 15, time_buffer, ACCENT_COLOR, 90)
 
     for i in range(client.nop):
         y = SCORE_Y + 15 + (i + 1) * 38
@@ -565,15 +561,15 @@ def render_screen(surface):
         name = client.gamers[i]['name'][:8] if i < len(client.gamers) else ""
         score = client.gamers[i]['score'] if i < len(client.gamers) else 0
 
-        draw_text(surface, SCORE_X + 10, y, name, player_color, 2)
-        draw_text(surface, SCORE_X + 162, y, ":", player_color, 2)
-        draw_text(surface, SCORE_X + 180, y, f"{score:3d}", player_color, 2)
+        draw_text(surface, SCORE_X + 10, y, name, player_color, 90)
+        draw_text(surface, SCORE_X + 162, y, ":", player_color, 90)
+        draw_text(surface, SCORE_X + 180, y, f"{score:3d}", player_color, 90)
 
     if client.head:
         node = client.head
         col = 0
         row = 0
-        guess_scale = 2
+        guess_scale = 90
         guess_row_height = 26
         guess_col_width = 160
         max_rows = (GUESS_H - 20) // guess_row_height
@@ -716,6 +712,9 @@ def main():
     global SOUND_ENABLED
     if args.quiet:
         SOUND_ENABLED = False
+    
+    # Initialize font early for UTF-8 support
+    init_font()
     
     client = GameClient(username=args.name, server=args.server, port=args.port)
     

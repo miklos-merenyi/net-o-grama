@@ -5,3 +5,4 @@ extern char *wordlist;
 void newGame();
 void solveIt(struct node* head);
 void shuffleString(char* thisWord);
+int utf8_strlen(const char* str);  // Count UTF-8 characters, not bytes

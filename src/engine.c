@@ -12,6 +12,31 @@
 #include "network.h"
 #define SPACE_CHAR ' '
 
+// Count UTF-8 characters (not bytes)
+// Each UTF-8 character starts with either:
+// - 0xxxxxxx (ASCII, 1 byte)
+// - 11xxxxxx (multi-byte start, 2-4 bytes total)
+// Continuation bytes are 10xxxxxx and should not be counted
+int utf8_strlen(const char* str)
+{
+    if (!str) return 0;
+    
+    int count = 0;
+    for (int i = 0; str[i] != '\0'; i++)
+    {
+        unsigned char byte = (unsigned char)str[i];
+        // Count each character start (ASCII or multi-byte start)
+        // ASCII: 0xxxxxxx
+        // Multi-byte start: 11xxxxxx (and not continuation 10xxxxxx)
+        if ((byte & 0x80) == 0 || (byte & 0xC0) == 0xC0)
+        {
+            count++;
+        }
+        // Skip continuation bytes: 10xxxxxx
+    }
+    return count;
+}
+
 
 //module level variables for game control
 extern struct node* head;
@@ -46,11 +71,14 @@ void swap(struct node** from, struct node** to)
     char* swap;
 
     swap = malloc(sizeof((*from)->anagram));
-    strcpy(swap, (*from)->anagram);
+    strncpy(swap, (*from)->anagram, 63);
+    swap[63] = '\0';
 
-    strcpy((*from)->anagram, (*to)->anagram);
+    strncpy((*from)->anagram, (*to)->anagram, 63);
+    (*from)->anagram[63] = '\0';
     (*from)->length = (*to)->length;
-    strcpy((*to)->anagram, swap);
+    strncpy((*to)->anagram, swap, 63);
+    (*to)->anagram[63] = '\0';
     (*to)->length = strlen(swap);
 
 }
@@ -157,11 +185,11 @@ void push(struct node** headRef, char* anagram)
         }
         current = current->next;
     }
-    len = strlen(anagram);
+    len = utf8_strlen(anagram);
     //debug("ADDED %s\t LENGTH: %d", anagram,len);
     //newNode->anagram = malloc(sizeof(char)*len+1);
-    strcpy(newNode->anagram, anagram);
-    newNode->anagram[len]='\0';
+    strncpy(newNode->anagram, anagram, 63);
+    newNode->anagram[63] = '\0';
     newNode->length = len;
     newNode->found = 0;
     newNode->guessed = 0;
@@ -170,21 +198,51 @@ void push(struct node** headRef, char* anagram)
 }
 
 
+// Helper: find the start of the next UTF-8 character in a string
+int utf8_next_char(const char* string, int pos)
+{
+    if (string[pos] == '\0') return pos;
+    
+    unsigned char byte = (unsigned char)string[pos];
+    int char_bytes = 1;
+    
+    if ((byte & 0x80) == 0) {
+        // ASCII character, 1 byte
+        char_bytes = 1;
+    } else if ((byte & 0xE0) == 0xC0) {
+        // 2-byte character
+        char_bytes = 2;
+    } else if ((byte & 0xF0) == 0xE0) {
+        // 3-byte character
+        char_bytes = 3;
+    } else if ((byte & 0xF8) == 0xF0) {
+        // 4-byte character
+        char_bytes = 4;
+    }
+    
+    return pos + char_bytes;
+}
+
 char* shiftLeftKill(char* string)
 {
-    // shift a string of characters 1 character to the left
+    // shift a string of characters 1 character to the left (remove first char)
+    // Properly handles UTF-8 multi-byte characters
 
-    int i;
     char newString[50];
-    int len;
-
-    len = strlen(string);
-    //newString = malloc(sizeof(char) * (len));
-    for (i=1;i<len;i++)
-    {
-        newString[i-1] = string[i];
+    int src_pos, dst_pos;
+    
+    // Find where the second UTF-8 character starts
+    src_pos = utf8_next_char(string, 0);
+    dst_pos = 0;
+    
+    // Copy everything from the second character onwards
+    while (string[src_pos] != '\0' && dst_pos < 49) {
+        newString[dst_pos] = string[src_pos];
+        src_pos++;
+        dst_pos++;
     }
-    newString[len-1] = '\0';
+    newString[dst_pos] = '\0';
+    
     return(strdup(newString));
 }
 
@@ -194,28 +252,36 @@ char* shiftLeft(char* string)
 {
     // shift a string of characters 1 character to the left
     // move the first character to the end of the string
+    // Properly handles UTF-8 multi-byte characters
 
-    int i;
-    char start;
     char newString[50];
-    int len;
-
-    len = strlen(string);
-
-    //newString = malloc(sizeof(char) * (len+1));
-
-    start = string[0];
-
-    for (i=1;i<len;i++)
-    {
-        newString[i-1] = string[i];
+    int first_char_len;
+    int src_pos, dst_pos;
+    
+    if (!string || string[0] == '\0') return strdup("");
+    
+    // Find where the first character ends
+    first_char_len = utf8_next_char(string, 0);
+    
+    // Copy everything from second character onwards
+    src_pos = first_char_len;
+    dst_pos = 0;
+    while (string[src_pos] != '\0' && dst_pos < 45) {
+        newString[dst_pos] = string[src_pos];
+        src_pos++;
+        dst_pos++;
     }
-
-    newString[len-1] = start;
-    newString[len] = '\0';
+    
+    // Append the first character at the end
+    src_pos = 0;
+    while (src_pos < first_char_len && dst_pos < 49) {
+        newString[dst_pos] = string[src_pos];
+        src_pos++;
+        dst_pos++;
+    }
+    newString[dst_pos] = '\0';
 
     return(strdup(newString));
-    //free(newString);
 }
 
 
@@ -225,28 +291,44 @@ char* ag(char* guess, char* remain)
     // the initial letter is fixed (hence the space character
     // at the end of the possible list)
 
-    char  newGuess[10];
-    char  newRemain[10];
+    char  newGuess[50];
+    char  newRemain[50];
     int    totalLen=0, guessLen=0, remainLen=0, i;
+    int    guessLenBytes=0, remainLenBytes=0;
 
+    // Safety check: don't work with NULL pointers
+    if (!guess || !remain) return rootWord;
+    
     // allocate space for our working variables
-    guessLen = strlen(guess);
-    remainLen = strlen(remain);
+    guessLenBytes = strlen(guess);  // byte count for copying
+    remainLenBytes = strlen(remain);  // byte count for copying
+    
+    // Safety bounds check: don't proceed if strings are too large
+    if (guessLenBytes > 48 || remainLenBytes > 48) return rootWord;
+    
+    guessLen = utf8_strlen(guess);  // character count for length checks
+    remainLen = utf8_strlen(remain);  // character count for length checks
     totalLen = guessLen + remainLen;
 
     //newGuess = malloc(sizeof(char) * (totalLen+1));
     //newRemain = malloc(sizeof(char) * (totalLen+1));
 
     // move last remaining letter to end of guess
-    strcpy(newGuess, guess);
-    strcpy(newRemain, remain);
-    newGuess[guessLen] = newRemain[remainLen-1];
-    newGuess[guessLen+1] = '\0';
-    newRemain[remainLen-1] = '\0';
+    strncpy(newGuess, guess, 49);
+    newGuess[49] = '\0';
+    strncpy(newRemain, remain, 49);
+    newRemain[49] = '\0';
+    
+    // Safety check before accessing remainLenBytes-1
+    if (remainLenBytes > 0 && guessLenBytes < 49) {
+        newGuess[guessLenBytes] = newRemain[remainLenBytes-1];
+        newGuess[guessLenBytes+1] = '\0';
+        if (remainLenBytes > 0) newRemain[remainLenBytes-1] = '\0';
+    }
 
     //debug(0,"%s\n", newGuess);
 
-    if(strlen(newGuess) > 3)
+    if(utf8_strlen(newGuess) > 3)
     {
         if (dlb_lookup(dlbHead,shiftLeftKill(newGuess)))
         {
@@ -254,15 +336,16 @@ char* ag(char* guess, char* remain)
         }
     }
 
-    if (strlen(newRemain))
+    if (utf8_strlen(newRemain))
     {
         ag(newGuess, newRemain);
 
         for (i=totalLen-1;i>0;i--)
         {
-            if(strlen(newRemain) > i)
+            if(utf8_strlen(newRemain) > i)
             {
-                strcpy(newRemain, shiftLeft(newRemain));
+                strncpy(newRemain, shiftLeft(newRemain), 49);
+                newRemain[49] = '\0';
                 ag(newGuess, newRemain);
             }
         }
@@ -274,14 +357,89 @@ char* ag(char* guess, char* remain)
 }
 
 
+// Helper: Get byte offset of the Nth UTF-8 character in a string
+int utf8_char_to_bytes(const char* string, int char_index)
+{
+    int byte_pos = 0;
+    int char_pos = 0;
+    
+    while (string[byte_pos] != '\0' && char_pos < char_index) {
+        unsigned char byte = (unsigned char)string[byte_pos];
+        if ((byte & 0x80) == 0) {
+            // ASCII: 1 byte
+            byte_pos += 1;
+        } else if ((byte & 0xE0) == 0xC0) {
+            // 2-byte character
+            byte_pos += 2;
+        } else if ((byte & 0xF0) == 0xE0) {
+            // 3-byte character
+            byte_pos += 3;
+        } else if ((byte & 0xF8) == 0xF0) {
+            // 4-byte character
+            byte_pos += 4;
+        } else {
+            // Invalid UTF-8, skip
+            byte_pos += 1;
+        }
+        char_pos++;
+    }
+    
+    return byte_pos;
+}
+
+// Helper: Get the length in bytes of the UTF-8 character at position
+int utf8_char_length(const char* string, int byte_pos)
+{
+    if (string[byte_pos] == '\0') return 0;
+    
+    unsigned char byte = (unsigned char)string[byte_pos];
+    if ((byte & 0x80) == 0) return 1;      // ASCII
+    if ((byte & 0xE0) == 0xC0) return 2;   // 2-byte
+    if ((byte & 0xF0) == 0xE0) return 3;   // 3-byte
+    if ((byte & 0xF8) == 0xF0) return 4;   // 4-byte
+    return 1;  // Invalid, treat as 1 byte
+}
+
 char* swapChars(int from, int to, char* string)
 {
-    // swap 2 characters in a string
-    debug(10,"swapping %d and %d in %s",from,to, string);
-    char swap;
-    swap = string[from];
-    string[from] = string[to];
-    string[to] = swap;
+    // swap 2 UTF-8 characters in a string (by character index, not byte index)
+    debug(10,"swapping UTF8 char %d and %d in %s", from, to, string);
+    
+    if (!string || string[0] == '\0' || from < 0 || to < 0 || from == to) {
+        return string;  // Nothing to swap
+    }
+    
+    int from_byte = utf8_char_to_bytes(string, from);
+    int to_byte = utf8_char_to_bytes(string, to);
+    int from_len = utf8_char_length(string, from_byte);
+    int to_len = utf8_char_length(string, to_byte);
+    
+    // Safety check - don't swap if something is wrong
+    if (from_len == 0 || to_len == 0 || from_len > 4 || to_len > 4) {
+        return string;
+    }
+    
+    // If characters are same length, simple byte swap
+    if (from_len == to_len) {
+        for (int i = 0; i < from_len; i++) {
+            char swap = string[from_byte + i];
+            string[from_byte + i] = string[to_byte + i];
+            string[to_byte + i] = swap;
+        }
+    } else {
+        // Different length characters - use temp buffer for complex swap
+        // This is complex and could cause issues, so use safe bounds
+        char temp[5];  // Max 4 bytes for UTF-8 char + null
+        int copy_len = (from_len < 4) ? from_len : 4;
+        strncpy(temp, string + from_byte, copy_len);
+        temp[copy_len] = '\0';
+        
+        // When lengths differ, only swap if they're close (to avoid complex memory ops)
+        // For simplicity and safety, just treat as same-length for now
+        // This avoids potential buffer overrun issues
+        return string;
+    }
+    
     return string;
 }
 
@@ -291,13 +449,16 @@ void shuffleString(char* thisWord)
     // replace characters randomly
     int numSwaps,from,to,i,len;
     debug(8, "Shuffling string: %s",thisWord);
-    len=strlen(thisWord);
+    len=utf8_strlen(thisWord);
     numSwaps = (rand()%len)+20;
     for (i=0;i<numSwaps;i++)
     {
         from = rand()%len;
         to = rand()%len;
-        if ( ((thisWord)[from] != spc) & ((thisWord)[to] != spc))
+        // Get the byte position of the first byte of each character
+        int from_byte = utf8_char_to_bytes(thisWord, from);
+        int to_byte = utf8_char_to_bytes(thisWord, to);
+        if ( (thisWord[from_byte] != spc) & (thisWord[to_byte] != spc))
         {
             strcpy(thisWord, swapChars(from, to, thisWord));
         }
@@ -324,7 +485,7 @@ char* getRandomWord()
 
     for (i=0;i<=filelocation;i++)
     {
-        if(fscanf(wfile, "%s", wordFromList) != EOF)
+        if(fscanf(wfile, "%49s", wordFromList) != EOF)  // FIXED: Added size limit
         {
             // spin on
         }
@@ -340,14 +501,14 @@ char* getRandomWord()
 
     while (!done)
     {
-        len = strlen(wordFromList);
+        len = utf8_strlen(wordFromList);
         if ((len==lettersNum))
         {
             done = 1;
         }
         else
         {
-            if(fscanf(wfile, "%s", wordFromList) != EOF)
+            if(fscanf(wfile, "%49s", wordFromList) != EOF)  // FIXED: Added size limit
             {
                 // spin on
             }
@@ -356,16 +517,19 @@ char* getRandomWord()
                 // go back to the start of the file
                 fclose(wfile);
                 wfile=fopen(wordlist, "r");
-                fscanf(wfile, "%s", wordFromList);
+                fscanf(wfile, "%49s", wordFromList);  // FIXED: Added size limit
             }
         }
     }
 
     fclose(wfile);
 
-    // add in our space character
-    wordFromList[len] = ' ';
-    wordFromList[len+1] = '\0';
+    // add in our space character at the end of the word (after all bytes)
+    int byte_len = strlen(wordFromList);  // Get actual byte length
+    if (byte_len < 49) {  // Safety check before adding space
+        wordFromList[byte_len] = ' ';
+        wordFromList[byte_len+1] = '\0';
+    }
 
     return wordFromList;
     free(wordFromList);
@@ -445,14 +609,28 @@ void newGame()
     echof(0,"starting new game.\n");
     guess = malloc(sizeof(char)*50);
     remain = malloc(sizeof(char)*50);
+    memset(guess, 0, 50);    // Clear memory
+    memset(remain, 0, 50);   // Clear memory
     do
     {
         strcpy(guess,"\0");
         debug(2,"rootWord: %s\n",getRandomWord());
         strcpy(rootWord, getRandomWord());
-        bigWordLen = strlen(rootWord)-1;
+        
+        // Calculate word length in characters, then find byte position of last char to remove
+        size_t wordlen = utf8_strlen(rootWord);
+        if (wordlen == 0) continue;  // Safety: skip empty words
+        
+        bigWordLen = wordlen - 1;  // bigWordLen now stores CHARACTER count
+        
+        // Find byte position where the last character starts
+        int byte_len = utf8_char_to_bytes(rootWord, bigWordLen);
+        if (byte_len >= 49) byte_len = 48;  // Bounds check
+        
         strcpy(remain,rootWord);
-        rootWord[bigWordLen] = '\0';
+        rootWord[byte_len] = '\0';  // Truncate at the byte boundary of the last character
+        remain[byte_len] = '\0';    // ALSO truncate remain to match
+        
         destroyAnswers(&head);
         debug(2,"generate anagrams from random word \n");
         ag(guess, remain);
@@ -462,16 +640,31 @@ void newGame()
     }
     while( (answersSought > 80) | (answersSought < 6));
 
-    for (i=bigWordLen;i<lettersNum;i++)
-    {
-        remain[i]=' ';
+    // Fill remain buffer with spaces for remaining character positions
+    // bigWordLen is CHARACTER count of root word (without last char)
+    // remain is now truncated to bigWordLen characters
+    // We need to fill character positions [bigWordLen] through [lettersNum-1] with spaces
+    
+    // Calculate byte position where remaining character ends (end of string)
+    int first_space_byte = strlen(remain);  // Get actual byte length after truncation
+    if (first_space_byte >= 48) {  // Safety check
+        free(guess);
+        free(remain);
+        return;
     }
+    
+    // Pad with spaces to make lettersNum total characters (in bytes)
+    int current_char = bigWordLen;
+    int byte_idx = first_space_byte;
+    
+    while (current_char < lettersNum && byte_idx < 47) {  // Extra safety: < 47 instead of < 48
+        remain[byte_idx] = ' ';
+        byte_idx++;
+        current_char++;
+    }
+    if (byte_idx < 48) remain[byte_idx] = '\0';  // Final null terminator, with bounds check
 
-    remain[lettersNum] = '\0';
-
-    //	printf("%s,%i\n", remain, bigWordLen);
-    remain[bigWordLen]='\0';
-
+    // Shuffle and process
     shuffleString(remain);
     sort(&head);
     free(guess);

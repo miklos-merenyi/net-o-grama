@@ -46,10 +46,10 @@ struct gamer
 struct gamer gamers[MAX_PLAYERS];
 
 struct node* head=NULL;
-char rootWord[10];
-char shuffle[]  = "        ";    //the actual shuffle of rootWord
-char answer[]   = "         ";
-char rem[]   = "         ";      //the actual remaining letters of shuffle
+char rootWord[65];  // Increased to handle 64-byte anagrams + null
+char shuffle[65];   // Increased to handle 64-byte shuffled anagrams
+char answer[65];    // Increased to handle 64-byte answers
+char rem[65];       // Increased to handle 64-byte remaining letters
 int blank[10];      // Stores byte position in rem[] for each character
 int char_len[10];   // Tracks byte length of each character (1 for ASCII, 2+ for UTF-8)
 int ans_len;        // Byte count in answer
@@ -278,8 +278,8 @@ void recv_msg()
 {
     int n,pos,gid;
     char * msg=NULL;
-    char tmpstr[10];             //max wordlength!!
-    char word[]="          ";
+    char tmpstr[65];             // Increased to handle multi-byte UTF-8 words
+    char word[65];              // Increased to handle 64-byte words
     n=read(srv,&buff[p],BS-p);
     if (n<0) debug(0," error in read(): %d",errno);
     if (n==0)                    //Connection lost
@@ -371,10 +371,12 @@ void recv_msg()
 
             case GETSHUFFLE:
                 debug(5,"Got shuffled word %s\n",msg);
-                strncpy(shuffle,msg,8);
-                shuffle[7]='\0';
-                strcpy(rem,shuffle);
-                strcpy(answer,"       ");
+                strncpy(shuffle, msg, 64);
+                shuffle[64] = '\0';
+                strncpy(rem, shuffle, 64);
+                rem[64] = '\0';
+                memset(answer, ' ', 64);
+                answer[64] = '\0';
                 state=COUNTDOWN;
                 break;
 

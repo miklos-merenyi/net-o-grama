@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+#include <locale.h>
 #include <ncurses.h>
 #include <stdarg.h>
 #include <signal.h>
@@ -308,6 +309,49 @@ void outline(WINDOW* win,char shadow, char outbyte)
 }
 
 
+// Helper function to convert Hungarian UTF-8 characters to their ASCII base
+// This allows block fonts to render close approximations
+static unsigned char utf8_to_ascii(unsigned char byte1, unsigned char byte2)
+{
+    // Hungarian UTF-8 characters with 0xC3 as first byte (U+00xx range)
+    if (byte1 == 0xC3) {
+        switch(byte2) {
+            case 0xA9: return 'e';  // é -> e
+            case 0xA8: return 'e';  // è -> e
+            case 0xAA: return 'e';  // ê -> e
+            case 0xAB: return 'e';  // ë -> e
+            case 0xAD: return 'i';  // í -> i
+            case 0xAC: return 'i';  // ì -> i
+            case 0xAE: return 'i';  // î -> i
+            case 0xAF: return 'i';  // ï -> i
+            case 0xA1: return 'a';  // á -> a
+            case 0xA0: return 'a';  // à -> a
+            case 0xA2: return 'a';  // â -> a
+            case 0xA3: return 'a';  // ã -> a
+            case 0xA4: return 'a';  // ä -> a
+            case 0xB3: return 'o';  // ó -> o
+            case 0xB2: return 'o';  // ò -> o
+            case 0xB4: return 'o';  // ô -> o
+            case 0xB5: return 'o';  // õ -> o
+            case 0xB6: return 'o';  // ö -> o
+            case 0xBA: return 'u';  // ú -> u
+            case 0xB9: return 'u';  // ù -> u
+            case 0xBB: return 'u';  // û -> u
+            case 0xBC: return 'u';  // ü -> u
+            default: return '?';
+        }
+    }
+    // Hungarian UTF-8 characters with 0xC5 as first byte (U+01xx range)
+    if (byte1 == 0xC5) {
+        switch(byte2) {
+            case 0xB1: return 'u';  // ű -> u
+            case 0x91: return 'o';  // ő -> o
+            default: return '?';
+        }
+    }
+    return '?';
+}
+
 void blWord(WINDOW* win,char *str,char shadow)
 {
     unsigned char ch;
@@ -316,14 +360,54 @@ void blWord(WINDOW* win,char *str,char shadow)
     unsigned char *font;
     int linenum,chnum;
     char outstr[7]="       ";
-    strncpy(outstr, str, strlen(str));
+    int i = 0;
+    int outpos = 0;
+    
+    // Convert UTF-8 string to ASCII equivalent for block font display
+    while (i < (int)strlen(str) && outpos < 7)
+    {
+        unsigned char byte1 = (unsigned char)str[i];
+        
+        // Check for UTF-8 multi-byte character
+        if (byte1 >= 0xC0 && byte1 <= 0xC5 && i + 1 < (int)strlen(str))
+        {
+            unsigned char byte2 = (unsigned char)str[i+1];
+            
+            // Check if this is a valid UTF-8 continuation byte
+            if ((byte2 & 0xC0) == 0x80)
+            {
+                // Convert to ASCII base character
+                outstr[outpos++] = utf8_to_ascii(byte1, byte2);
+                i += 2;  // Skip both bytes
+                continue;
+            }
+        }
+        
+        // Regular ASCII character
+        if (byte1 >= 32 && byte1 <= 126)
+        {
+            outstr[outpos++] = byte1;
+        }
+        else
+        {
+            outstr[outpos++] = ' ';  // Convert non-printable to space
+        }
+        i++;
+    }
+    
+    // Pad with spaces
+    while (outpos < 7)
+    {
+        outstr[outpos++] = ' ';
+    }
+    
     font=(unsigned char *)&charset;
     for (linenum = 0; linenum < 8; linenum++)
     {
         for (chnum = 0; chnum < 7; chnum++)
         {
-            ch      = outstr[chnum]-(32*(outstr[chnum]>=97 && outstr[chnum]<=122));
-            ch_off  = (int) ch * 8;
+            ch = outstr[chnum] - (32 * (outstr[chnum] >= 97 && outstr[chnum] <= 122));
+            ch_off = (int)ch * 8;
             ch_addr = font + ch_off + linenum;
             outline(win, shadow, *ch_addr);
         }
@@ -444,9 +528,15 @@ void endScreen()
 
 void initScreen()
 {
+    // Set locale to support UTF-8 characters
+    setlocale(LC_ALL, "");
+    setlocale(LC_CTYPE, "en_US.UTF-8");
+    
     initscr();
     raw();
     keypad(stdscr,TRUE);
+    
+    // Enable UTF-8 support in ncurses
     if (has_colors())
         // set up color pairs
     {

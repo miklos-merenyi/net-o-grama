@@ -304,7 +304,7 @@ int startNewGame()
     struct node* nod;
     int id=0;
     int i=3;
-    char shuffle[8];
+    char shuffle[65];  // Changed from 8 to 65 to accommodate 64-byte anagrams + null terminator
     if (!player1)
     {
         echof(0,"Game is not started, as there are no players connected.\n");
@@ -342,7 +342,8 @@ int startNewGame()
     //send shuffled word
     nod=head;
     while(nod->next) nod=nod->next;
-    strcpy(shuffle,nod->anagram);
+    strncpy(shuffle,nod->anagram,64);  // Use strncpy with bounds checking
+    shuffle[64] = '\0';  // Ensure null termination
     shuffleString(shuffle);
     echof(1,"sending shuffled word to all\n");
     send2all("%s\0",shuffle);
