@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 #include <ctype.h>
 #include <string.h>
 #include "cli_sdl.h"
@@ -32,8 +33,9 @@ int key_QUIT = 27;
 
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
-static char currentWord[16] = "";
-static char currentTry[16] = "";
+static TTF_Font *font = NULL;
+static char currentWord[64] = "";  // Increased for UTF-8 multi-byte characters
+static char currentTry[64] = "";   // Increased for UTF-8 multi-byte characters
 static int currentTime = 0;
 static struct node *currentHead = NULL;
 
@@ -45,82 +47,32 @@ static SDL_Color playerColors[4] = {
     {0, 255, 255, 255}    // Player 3: Cyan
 };
 
-static const uint8_t sdl_font[][8] = {
-    {0x18,0x24,0x42,0x42,0x7E,0x42,0x42,0x42}, // A
-    {0x7C,0x42,0x42,0x7C,0x42,0x42,0x42,0x7C}, // B
-    {0x3C,0x42,0x40,0x40,0x40,0x40,0x42,0x3C}, // C
-    {0x78,0x44,0x42,0x42,0x42,0x42,0x44,0x78}, // D
-    {0x7E,0x40,0x40,0x7C,0x40,0x40,0x40,0x7E}, // E
-    {0x7E,0x40,0x40,0x7C,0x40,0x40,0x40,0x40}, // F
-    {0x3C,0x42,0x40,0x4E,0x42,0x42,0x42,0x3C}, // G
-    {0x42,0x42,0x42,0x7E,0x42,0x42,0x42,0x42}, // H
-    {0x3C,0x18,0x18,0x18,0x18,0x18,0x18,0x3C}, // I
-    {0x1E,0x08,0x08,0x08,0x08,0x48,0x48,0x30}, // J
-    {0x42,0x44,0x48,0x70,0x48,0x44,0x42,0x42}, // K
-    {0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x7E}, // L
-    {0x42,0x66,0x5A,0x5A,0x42,0x42,0x42,0x42}, // M
-    {0x42,0x62,0x52,0x4A,0x46,0x42,0x42,0x42}, // N
-    {0x3C,0x42,0x42,0x42,0x42,0x42,0x42,0x3C}, // O
-    {0x7C,0x42,0x42,0x7C,0x40,0x40,0x40,0x40}, // P
-    {0x3C,0x42,0x42,0x42,0x42,0x4A,0x44,0x3A}, // Q
-    {0x7C,0x42,0x42,0x7C,0x48,0x44,0x42,0x42}, // R
-    {0x3C,0x42,0x40,0x3C,0x02,0x02,0x42,0x3C}, // S
-    {0x7E,0x18,0x18,0x18,0x18,0x18,0x18,0x18}, // T
-    {0x42,0x42,0x42,0x42,0x42,0x42,0x42,0x3C}, // U
-    {0x42,0x42,0x42,0x42,0x42,0x42,0x24,0x18}, // V
-    {0x42,0x42,0x42,0x42,0x5A,0x5A,0x66,0x42}, // W
-    {0x42,0x42,0x24,0x18,0x18,0x24,0x42,0x42}, // X
-    {0x42,0x42,0x42,0x24,0x18,0x18,0x18,0x18}, // Y
-    {0x7E,0x02,0x04,0x08,0x10,0x20,0x40,0x7E}, // Z
-    {0x3C,0x42,0x62,0x52,0x4A,0x46,0x42,0x3C}, // 0
-    {0x18,0x38,0x18,0x18,0x18,0x18,0x18,0x3C}, // 1
-    {0x3C,0x42,0x02,0x04,0x08,0x10,0x20,0x7E}, // 2
-    {0x3C,0x42,0x02,0x1C,0x02,0x02,0x42,0x3C}, // 3
-    {0x04,0x0C,0x14,0x24,0x44,0x7E,0x04,0x04}, // 4
-    {0x7E,0x40,0x40,0x7C,0x02,0x02,0x42,0x3C}, // 5
-    {0x3C,0x40,0x40,0x7C,0x42,0x42,0x42,0x3C}, // 6
-    {0x7E,0x02,0x04,0x08,0x10,0x10,0x10,0x10}, // 7
-    {0x3C,0x42,0x42,0x3C,0x42,0x42,0x42,0x3C}, // 8
-    {0x3C,0x42,0x42,0x42,0x3E,0x02,0x02,0x3C}, // 9
-    {0x00,0x18,0x18,0x00,0x00,0x18,0x18,0x00}, // :
-    {0x00,0x00,0x00,0x7E,0x00,0x00,0x00,0x00}, // -
-    {0x00,0x00,0x00,0x00,0x00,0x18,0x18,0x00}, // .
-    {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}  // space
-};
-
-static const char sdl_font_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:-. ";
-
-static const uint8_t *getGlyph(char c)
-{
-    char key = (char) toupper((unsigned char)c);
-    for (size_t i = 0; i < sizeof(sdl_font_chars) - 1; ++i)
-    {
-        if (sdl_font_chars[i] == key)
-            return sdl_font[i];
-    }
-    return sdl_font[sizeof(sdl_font_chars) - 2];
-}
-
+// TTF-based text rendering (UTF-8 support)
 static void drawText(SDL_Renderer *renderer, int x, int y, const char *text, SDL_Color color, int scale)
 {
-    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-    for (size_t i = 0; i < strlen(text); ++i)
-    {
-        const uint8_t *glyph = getGlyph(text[i]);
-        for (int row = 0; row < 8; ++row)
-        {
-            for (int col = 0; col < 8; ++col)
-            {
-                if (glyph[row] & (1 << (7 - col)))
-                {
-                    SDL_Rect pixel = {x + col * scale, y + row * scale, scale, scale};
-                    SDL_RenderFillRect(renderer, &pixel);
-                }
-            }
-        }
-        x += (8 + 1) * scale;
+    if (!font || !text || strlen(text) == 0) return;
+    
+    SDL_Surface *textSurface = TTF_RenderUTF8_Solid(font, text, color);
+    if (!textSurface) return;
+    
+    SDL_Texture *textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+    if (!textTexture) {
+        SDL_FreeSurface(textSurface);
+        return;
     }
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    
+    // Properly scale the text without distortion
+    int destW = textSurface->w;
+    int destH = textSurface->h;
+    if (scale > 1) {
+        destW = (textSurface->w * scale + 50) / 100;  // Scale as percentage
+        destH = (textSurface->h * scale + 50) / 100;
+    }
+    SDL_Rect destRect = {x, y, destW, destH};
+    SDL_RenderCopy(renderer, textTexture, NULL, &destRect);
+    
+    SDL_DestroyTexture(textTexture);
+    SDL_FreeSurface(textSurface);
 }
 
 static void drawPanel(SDL_Renderer *renderer, const SDL_Rect *rect, SDL_Color bg, SDL_Color border)
@@ -150,12 +102,12 @@ static void renderScreen()
     drawPanel(renderer, &scoreRect, panel, border);
     drawPanel(renderer, &guessRect, panel, border);
 
-    drawText(renderer, PLAY_X + 16, PLAY_Y + 18, currentWord, text, 5);
-    drawText(renderer, PLAY_X + 16, PLAY_Y + 120, currentTry, accent, 5);
+    drawText(renderer, PLAY_X + 16, PLAY_Y + 18, currentWord, text, 150);  // 150% scale
+    drawText(renderer, PLAY_X + 16, PLAY_Y + 120, currentTry, accent, 150);
 
     char timeBuffer[16];
     snprintf(timeBuffer, sizeof(timeBuffer), "TIME:%3d", currentTime);
-    drawText(renderer, SCORE_X + 10, SCORE_Y + 15, timeBuffer, accent, 2);
+    drawText(renderer, SCORE_X + 10, SCORE_Y + 15, timeBuffer, accent, 120);  // 120% scale
 
     for (int i = 0; i < nop; ++i)
     {
@@ -166,11 +118,11 @@ static void renderScreen()
         while (*nameStart == ' ' && *nameStart != '\0') nameStart++;
         strncpy(nameDisplay, nameStart, 8);
         nameDisplay[8] = '\0';
-        drawText(renderer, SCORE_X + 10, y, nameDisplay, playerColor, 2);
-        drawText(renderer, SCORE_X + 154, y, ":", playerColor, 2);
+        drawText(renderer, SCORE_X + 10, y, nameDisplay, playerColor, 120);
+        drawText(renderer, SCORE_X + 154, y, ":", playerColor, 120);
         char scoreText[16];
         snprintf(scoreText, sizeof(scoreText), "%3d", gamers[i].score);
-        drawText(renderer, SCORE_X + 180, y, scoreText, playerColor, 2);
+        drawText(renderer, SCORE_X + 180, y, scoreText, playerColor, 120);
     }
 
     if (currentHead)
@@ -178,7 +130,7 @@ static void renderScreen()
         const struct node *nod = currentHead;
         int col = 0;
         int row = 0;
-        const int guessScale = 2;
+        const int guessScale = 120;  // 120% scale (percentage format)
         const int guessRowHeight = 26;
         const int guessColWidth = 160;
         const int maxRows = (GUESS_H - 20) / guessRowHeight;
@@ -219,11 +171,18 @@ void initScreen()
         fprintf(stderr, "SDL_Init Error: %s\n", SDL_GetError());
         exit(1);
     }
+    if (TTF_Init() != 0)
+    {
+        fprintf(stderr, "TTF_Init Error: %s\n", TTF_GetError());
+        SDL_Quit();
+        exit(1);
+    }
     window = SDL_CreateWindow("Net-o-Grama SDL2 Client", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                               WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
     if (!window)
     {
         fprintf(stderr, "SDL_CreateWindow Error: %s\n", SDL_GetError());
+        TTF_Quit();
         SDL_Quit();
         exit(1);
     }
@@ -232,9 +191,40 @@ void initScreen()
     {
         fprintf(stderr, "SDL_CreateRenderer Error: %s\n", SDL_GetError());
         SDL_DestroyWindow(window);
+        TTF_Quit();
         SDL_Quit();
         exit(1);
     }
+    
+    // Load a system font for UTF-8 support (DejaVuSans supports Hungarian characters)
+    // Using larger base font size to render at good quality with scaling
+    font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 42);
+    if (!font)
+    {
+        font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 42);
+    }
+    if (!font)
+    {
+        // Try alternative paths
+        font = TTF_OpenFont("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 40);
+    }
+    if (!font)
+    {
+        font = TTF_OpenFont("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 40);
+    }
+    if (!font)
+    {
+        // Fall back to any available monospace font
+        font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 38);
+    }
+    if (!font)
+    {
+        fprintf(stderr, "Warning: Could not load TTF font, using built-in rendering\n");
+    }
+    
+    // Enable text input for UTF-8 character support (including Hungarian accented characters)
+    SDL_StartTextInput();
+    
     memset(currentWord, 0, sizeof(currentWord));
     memset(currentTry, 0, sizeof(currentTry));
     currentTime = 0;
@@ -244,8 +234,10 @@ void initScreen()
 
 void endScreen()
 {
+    if (font) TTF_CloseFont(font);
     if (renderer) SDL_DestroyRenderer(renderer);
     if (window) SDL_DestroyWindow(window);
+    TTF_Quit();
     SDL_Quit();
 }
 
@@ -292,6 +284,21 @@ void handle_input(SDL_Event *event)
         sendf(srv, "quit");
         exit(0);
     }
+    
+    // Handle SDL_TEXTINPUT for UTF-8 characters and regular ASCII (including Hungarian accented characters)
+    if (event->type == SDL_TEXTINPUT)
+    {
+        const char *text = event->text.text;
+        // Process each byte of the UTF-8 string through keyPressed
+        // This handles both ASCII and UTF-8 multi-byte characters
+        for (int i = 0; text[i] != '\0'; i++)
+        {
+            keyPressed((unsigned char)text[i]);
+        }
+        return;  // Don't process this as KEYDOWN as well
+    }
+    
+    // Handle SDL_KEYDOWN only for special keys (not text characters)
     if (event->type != SDL_KEYDOWN) return;
     SDL_Keycode key = event->key.keysym.sym;
     int mapped = 0;
@@ -302,8 +309,8 @@ void handle_input(SDL_Event *event)
     else if (key == SDLK_LEFT) mapped = key_DELCHAR;
     else if (key == SDLK_BACKSPACE) mapped = key_CLEAR;
     else if (key == SDLK_TAB) mapped = key_SOLVE;
-    else if (key >= SDLK_a && key <= SDLK_z) mapped = (int) key;
-    else if (key >= SDLK_1 && key <= SDLK_7) mapped = '1' + (key - SDLK_1);
+    // DO NOT handle a-z or 1-7 here - let SDL_TEXTINPUT handle those
+    // Only special keys should be handled by KEYDOWN
     if (mapped) keyPressed(mapped);
 }
 

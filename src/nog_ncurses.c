@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <string.h>
+#include <locale.h>
 #include <ncurses.h>
 #include <signal.h>
 #include <glib.h>
@@ -40,6 +41,8 @@ Mix_Chunk* getSound(char* name) { return NULL; }
 
 int main(int argc, char* argv[])
 {
+    setlocale(LC_ALL, "");
+    setlocale(LC_CTYPE, "en_US.UTF-8");
     GOptionContext *context;
     void usage(int t)
     {
@@ -114,6 +117,7 @@ int main(int argc, char* argv[])
     free(debuglevel_text);
 
     g_option_context_free(context);
+    wordlist = "./wordlist.en";  // Initialize wordlist pointer
     //exit(1);
     initLogfile(logfile);
     initConnection(srvname,port);

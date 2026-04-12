@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <glib.h>
+#include <locale.h>
 #include "network.h"
 #include <stdio.h>
 #include "debug.h"
@@ -47,10 +48,13 @@ struct player
     int alive;                   // for heartbeat
 };
 
+
 struct player* player1=NULL;     // the head of the list of the players
 struct node* head=NULL;
 char rootWord[10];
 int foglalat;
+
+extern char *wordlist;  // Defined in engine.c
 
 char quit=0;
 int gameIsOn=0;
@@ -558,6 +562,8 @@ void sigpipe_hndl(int sig)
 
 int main(int argc, char *argv[])
 {
+    setlocale(LC_ALL, "");
+    setlocale(LC_CTYPE, "en_US.UTF-8");
     int port=PORT;
     int nbst=0;
     int r;
@@ -565,7 +571,7 @@ int main(int argc, char *argv[])
     struct timeval tv;
     struct player* current;
     char * logfile="./nog_srv.log";
-    char * wordlist="./wordlist.txt";
+    wordlist = "./wordlist.en";
     debugLevel=10;
 
     GOptionContext *context;

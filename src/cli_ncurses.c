@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 #include <ncurses.h>
 #include <stdarg.h>
 #include <signal.h>
@@ -511,7 +512,7 @@ void gameLoop()
         if (FD_ISSET(srv,&rd)) recv_msg();
         if (FD_ISSET(0,&rd))
         {
-            key=getch();
+            int key = getch();
             keyPressed(key);
         }
         heartBeat();

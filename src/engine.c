@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <locale.h>
 #include <curses.h>
 #include <getopt.h>
 #include <sys/stat.h>
@@ -11,11 +12,16 @@
 #include "network.h"
 #define SPACE_CHAR ' '
 
+
 //module level variables for game control
 extern struct node* head;
 struct dlb_node* dlbHead;
 extern char rootWord[10];
+char *wordlist = NULL;  // Wordlist filename, initialized by main()
 char spc=' '+32;
+__attribute__((constructor)) static void set_utf8_locale() {
+    setlocale(LC_ALL, "");
+}
 int lettersNum = 7;
 int gameStart = 0;
 int gameTime=AVAILABLE_TIME;
@@ -299,35 +305,39 @@ void shuffleString(char* thisWord)
 }
 
 
+
 char* getRandomWord()
 {
-    FILE* wordlist;
     int filelocation;
     int i;
     char* wordFromList = malloc(sizeof(char) * 50);
     int len;
     int done = 0;
     filelocation = rand()%1000;
-    if ((wordlist=fopen("wordlist.txt","r"))==NULL )
+
+    FILE* wfile;
+    if ((wfile=fopen(wordlist,"r"))==NULL )
     {
         error(1,errno,"Can't open wordlist file");
     }
 
+
     for (i=0;i<=filelocation;i++)
     {
-        if(fscanf(wordlist, "%s", wordFromList) != EOF)
+        if(fscanf(wfile, "%s", wordFromList) != EOF)
         {
             // spin on
         }
         else
         {
             // go back to the start of the file
-            fclose(wordlist);
-            fopen("wordlist.txt", "r");
+            fclose(wfile);
+            wfile=fopen(wordlist, "r");
         }
     }
 
     // ok random location reached
+
     while (!done)
     {
         len = strlen(wordFromList);
@@ -337,22 +347,21 @@ char* getRandomWord()
         }
         else
         {
-
-            if(fscanf(wordlist, "%s", wordFromList) != EOF)
+            if(fscanf(wfile, "%s", wordFromList) != EOF)
             {
                 // spin on
             }
             else
             {
                 // go back to the start of the file
-                fclose(wordlist);
-                fopen("wordlist.txt", "r");
-                fscanf(wordlist, "%s", wordFromList);
+                fclose(wfile);
+                wfile=fopen(wordlist, "r");
+                fscanf(wfile, "%s", wordFromList);
             }
         }
     }
 
-    fclose(wordlist);
+    fclose(wfile);
 
     // add in our space character
     wordFromList[len] = ' ';

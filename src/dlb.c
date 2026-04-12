@@ -86,18 +86,23 @@ void createDLBTree(struct dlb_node** dlbHead, char* wordlist_file)
     // open the wordlist file and push all words onto the dictionary
 
     FILE* wordlist;
-    char wordFromList[50];
+    char wordFromList[128]; // Increased for UTF-8
 
     //printf("createDLBTree\n");
 
     // open wordlist file
     wordlist = fopen(wordlist_file, "r");
-    if (!wordlist) error(1,errno,"error opening wordlist.txt");
+    if (!wordlist) error(1,errno,"error opening wordlist.en");
 
-    // get each word from the list
-    while (fscanf(wordlist, "%s", wordFromList) != EOF)
+    // get each word from the list (UTF-8 safe)
+    while (fgets(wordFromList, sizeof(wordFromList), wordlist) != NULL)
     {
-        dlb_push(&(*dlbHead),wordFromList);
+        // Remove trailing newline
+        size_t len = strlen(wordFromList);
+        if (len > 0 && wordFromList[len - 1] == '\n')
+            wordFromList[len - 1] = '\0';
+        if (wordFromList[0] != '\0')
+            dlb_push(&(*dlbHead), wordFromList);
     }
 
     // close wordlist file

@@ -15,7 +15,7 @@ extern int debugLevel;
 extern char * logfile;
 struct node
 {
-    char    anagram[10];
+    char    anagram[64]; // Increased for UTF-8
     int     found;
     int     guessed;
     int     length;
@@ -25,4 +25,5 @@ struct node
 
 void destroyAnswers(struct node** headRef);
 int whereinstr(char* string, char letter);
+int whereinstr_utf8(char* string, const char* utf8_bytes, int utf8_len);
 void nextWord(char* to, char *string, int *pos);

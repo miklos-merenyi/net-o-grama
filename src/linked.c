@@ -5,7 +5,7 @@
 
 struct node
 {
-    char    anagram[10];
+    char    anagram[64]; // Increased for UTF-8
     int     found;
     int     guessed;
     int     length;
@@ -33,13 +33,56 @@ void nextWord(char* to, char *string, int *pos)
 
 int whereinstr(char* string, char letter)
 {
+    unsigned char search = (unsigned char)letter;
     int i;
-    for(i=0;i<=strlen(string);i++)
-    {
-        if (string[i]==letter)
-            return i;
+    
+    // For single-byte ASCII characters only
+    if (search < 0x80) {
+        for(i = 0; i <= (int)strlen(string); i++) {
+            if ((unsigned char)string[i] == search)
+                return i;
+        }
+        return(-1);
     }
+    
+    // Multi-byte UTF-8 should use whereinstr_utf8() instead
     return(-1);
+}
+
+// Search for a complete UTF-8 character (multi-byte sequence) in a string
+// utf8_bytes: buffer containing the complete UTF-8 character bytes
+// utf8_len: number of bytes in the UTF-8 character (e.g., 2 for 'í')
+// Returns: position of the first matching sequence, or -1 if not found
+int whereinstr_utf8(char* string, const char* utf8_bytes, int utf8_len)
+{
+    if (!string || !utf8_bytes || utf8_len <= 0 || utf8_len > 4) {
+        return -1;
+    }
+    
+    int string_len = strlen(string);
+    
+    // Search for the complete UTF-8 byte sequence
+    for (int i = 0; i < string_len; i++) {
+        // Check if we have enough remaining bytes to match
+        if (i + utf8_len > string_len) {
+            break;
+        }
+        
+        // Compare all bytes of the UTF-8 sequence
+        int match = 1;
+        for (int j = 0; j < utf8_len; j++) {
+            if ((unsigned char)string[i + j] != (unsigned char)utf8_bytes[j]) {
+                match = 0;
+                break;
+            }
+        }
+        
+        if (match) {
+            return i;  // Found the complete sequence
+        }
+    }
+    
+    return -1;  // Not found
 }
 
 

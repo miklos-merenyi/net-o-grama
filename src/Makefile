@@ -14,6 +14,8 @@ SDL2_CFLAGS := $(shell sdl2-config --cflags 2>/dev/null)
 SDL2_LIBS   := $(shell sdl2-config --libs 2>/dev/null)
 SDL2_MIXER_CFLAGS := $(shell pkg-config --cflags SDL2_mixer 2>/dev/null || pkg-config --cflags SDL_mixer 2>/dev/null)
 SDL2_MIXER_LIBS := $(shell pkg-config --libs SDL2_mixer 2>/dev/null || pkg-config --libs SDL_mixer 2>/dev/null || echo -lSDL2_mixer -lSDL2)
+SDL2_TTF_CFLAGS := $(shell pkg-config --cflags SDL2_ttf 2>/dev/null)
+SDL2_TTF_LIBS := $(shell pkg-config --libs SDL2_ttf 2>/dev/null || echo -lSDL2_ttf)
 
 NCURSES_LIBS := $(shell pkg-config --libs ncursesw 2>/dev/null || echo -lncurses)
 
@@ -26,7 +28,7 @@ nog_ncurses : debug.o client.o nog_ncurses.o network.o linked.o dlb.o cli_ncurse
 	$(CC) $(CFLAGS) -DHAVE_SDL2_MIXER -o ../nog_ncurses nog_ncurses.o debug.o network.o linked.o dlb.o cli_ncurses.o engine.o client.o sound.o $(SDL2_LIBS) $(SDL2_MIXER_LIBS) $(GLIB_LFLAGS) $(NCURSES_LIBS)
 
 nog_sdl : debug.o client.o nog_sdl.o network.o linked.o dlb.o cli_sdl.o engine.o sound.o
-	$(CC) $(CFLAGS) -o ../nog_sdl nog_sdl.o debug.o network.o linked.o dlb.o cli_sdl.o engine.o client.o sound.o $(SDL2_LIBS) $(SDL2_MIXER_LIBS) $(GLIB_LFLAGS)
+	$(CC) $(CFLAGS) -o ../nog_sdl nog_sdl.o debug.o network.o linked.o dlb.o cli_sdl.o engine.o client.o sound.o $(SDL2_LIBS) $(SDL2_MIXER_LIBS) $(SDL2_TTF_LIBS) $(GLIB_LFLAGS)
 
 
 nog_srv.o : nog_srv.c
@@ -60,7 +62,8 @@ linked.o: linked.c
 cli_ncurses.o: cli_ncurses.c 
 	gcc $(LFLAGS) -c cli_ncurses.c
 
-cli_sdl.o: cli_sdl.c 
+cli_sdl.o: cli_sdl.c
+	gcc $(LFLAGS) $(GLIB_CFLAGS) $(SDL2_CFLAGS) $(SDL2_MIXER_CFLAGS) $(SDL2_TTF_CFLAGS) -c cli_sdl.c 
 	gcc $(LFLAGS) $(SDL2_CFLAGS) -c cli_sdl.c
 
 sprite.o: sprite.c

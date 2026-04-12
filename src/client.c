@@ -50,8 +50,10 @@ char rootWord[10];
 char shuffle[]  = "        ";    //the actual shuffle of rootWord
 char answer[]   = "         ";
 char rem[]   = "         ";      //the actual remaining letters of shuffle
-int blank[10];
-int ans_len;
+int blank[10];      // Stores byte position in rem[] for each character
+int char_len[10];   // Tracks byte length of each character (1 for ASCII, 2+ for UTF-8)
+int ans_len;        // Byte count in answer
+int char_count;     // Character count (separate from byte count for UTF-8)
 //int srv;
 int quit=0;
 int nop=0;                       // number of players
@@ -80,6 +82,7 @@ void clearAnswer()
     if (!delAnswer) return;
     answer[0]='\0';
     ans_len=0;
+    char_count=0;
     strncpy(rem,shuffle,sizeof(shuffle)-1);
     updatePlayField(rem,answer,0);
 }
@@ -87,6 +90,45 @@ void clearAnswer()
 
 void keyPressed(int key)
 {
+    // UTF-8 buffering for multi-byte sequences
+    static char utf8_buffer[4] = {0};
+    static int utf8_len = 0;
+    static int saved_utf8_len = 0;
+    
+    unsigned char byte = (unsigned char)key;
+    
+    // Handle UTF-8 multi-byte sequences: collect bytes until complete
+    if (utf8_len > 0 || (byte >= 0xC0 && byte <= 0xF7)) {
+        utf8_buffer[utf8_len] = byte;
+        utf8_len++;
+        
+        // For 2-byte UTF-8 (e.g., Hungarian characters like 'í' = 0xC3 0xAD)
+        if (utf8_len == 2) {
+            if ((byte & 0xC0) == 0x80) {
+                // Valid second byte, character is complete
+                saved_utf8_len = utf8_len;
+                utf8_len = 0;
+                // Process the character
+                // ... fall through to handle it below
+            } else {
+                utf8_len = 0;
+                memset(utf8_buffer, 0, sizeof(utf8_buffer));
+                return;
+            }
+        } else if (utf8_len > 2) {
+            utf8_len = 0;
+            memset(utf8_buffer, 0, sizeof(utf8_buffer));
+            return;
+        } else if (utf8_len == 1 && (byte & 0x80) == 0) {
+            // Single ASCII byte, process normally
+            saved_utf8_len = utf8_len;
+            utf8_len = 0;
+        } else {
+            // Waiting for more bytes
+            return;
+        }
+    }
+
     if (key==key_QUIT)
     {
         sendf(srv,"quit");
@@ -125,15 +167,29 @@ void keyPressed(int key)
             }
             if (key==key_DELCHAR)
             {
-                if (ans_len<=0) break;
-                rem[blank[ans_len]]=answer[ans_len-1];
-                answer[--ans_len]='\0';
+                if (char_count<=0) break;
+                // Restore all bytes of the character we're deleting
+                int char_idx = char_count - 1;
+                int num_bytes = char_len[char_idx];
+                int rem_pos = blank[char_idx];
+                
+                // Restore all bytes of this character to rem
+                for (int i = 0; i < num_bytes && i < 4; i++) {
+                    rem[rem_pos + i] = answer[ans_len - num_bytes + i];
+                }
+                
+                // Remove all bytes from answer
+                ans_len -= num_bytes;
+                answer[ans_len] = '\0';
+                char_count--;
+                
                 updatePlayField(rem,answer,0);
             }
             if (key==key_SOLVE)
             {
                 sendf(srv,"solve");
             }
+            // Handle ASCII characters a-z
             if (key>='a' && key<='z')
             {
                 int pos;
@@ -143,9 +199,38 @@ void keyPressed(int key)
                     answer[ans_len++]=key;
                     answer[ans_len]='\0';
                     rem[pos]=' ';
-                    blank[ans_len]=pos;
+                    blank[char_count] = pos;
+                    char_len[char_count] = 1;  // ASCII is always 1 byte
+                    char_count++;
                     updatePlayField(rem,answer,0);
                 }
+                saved_utf8_len = 0;  // Reset UTF-8 state for next input
+            }
+            // Handle UTF-8 multi-byte characters (Hungarian: éíóúüűöő)
+            else if (saved_utf8_len >= 2)
+            {
+                int pos;
+                // Search for the complete UTF-8 character sequence
+                pos = whereinstr_utf8(rem, utf8_buffer, saved_utf8_len);
+                if (pos != -1)
+                {
+                    // Add complete UTF-8 character to answer
+                    for (int i = 0; i < saved_utf8_len && i < 4; i++) {
+                        answer[ans_len++] = utf8_buffer[i];
+                    }
+                    answer[ans_len] = '\0';
+                    
+                    // Clear all bytes of UTF-8 character from rem
+                    for (int i = 0; i < saved_utf8_len && i < 4; i++) {
+                        rem[pos + i] = ' ';
+                    }
+                    blank[char_count] = pos;
+                    char_len[char_count] = saved_utf8_len;  // Track multi-byte length
+                    char_count++;
+                    updatePlayField(rem,answer,0);
+                }
+                saved_utf8_len = 0;
+                memset(utf8_buffer, 0, sizeof(utf8_buffer));
             }
             if (key>='1' && key<='7')
             {
@@ -156,9 +241,12 @@ void keyPressed(int key)
                     answer[ans_len++]=rem[pos];
                     answer[ans_len]='\0';
                     rem[pos]=' ';
-                    blank[ans_len]=pos;
+                    blank[char_count] = pos;
+                    char_len[char_count] = 1;  // Direct position matching is 1 byte
+                    char_count++;
                     updatePlayField(rem,answer,0);
                 }
+                saved_utf8_len = 0;  // Reset UTF-8 state for next input
             }
             break;
 
@@ -221,6 +309,7 @@ void recv_msg()
                         nop=0;
                         strcpy(answer,"         ");
                         ans_len=0;
+                        char_count=0;
                         state=GAMEISON;
                         debug(0,"Waiting for the ID..\n");
                         state=GETID;
