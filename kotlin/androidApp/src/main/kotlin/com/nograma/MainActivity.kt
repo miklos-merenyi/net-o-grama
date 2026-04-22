@@ -309,9 +309,24 @@ fun GameScreen(activity: MainActivity, createGameClient: (String, Int, String) -
                                 gameClient?.submitWord(currentAnswer)
                                 currentAnswer = ""
                             },
-                            modifier = Modifier.align(Alignment.CenterVertically)
+                            modifier = Modifier.align(Alignment.CenterVertically),
+                            contentPadding = PaddingValues(4.dp)
                         ) {
-                            Icon(Icons.Filled.Send, contentDescription = "Send")
+                            Icon(Icons.Filled.Send, contentDescription = "Send and Clear", modifier = Modifier.size(20.dp))
+                        }
+                        
+                        Button(
+                            onClick = {
+                                gameClient?.submitWord(currentAnswer)
+                                // Don't clear answer - keep it for next submission
+                            },
+                            modifier = Modifier.align(Alignment.CenterVertically),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary
+                            ),
+                            contentPadding = PaddingValues(4.dp)
+                        ) {
+                            Text("Keep", fontSize = 12.sp)
                         }
                     }
                     

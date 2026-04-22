@@ -594,6 +594,10 @@ def render_screen(surface):
                 col += 1
             node = node.get('next')
 
+    # Draw help text at bottom
+    help_text = "ENTER: Submit & Clear | RIGHT: Submit & Keep | SPACE: Shuffle | ESC: Quit"
+    draw_text(surface, 20, WINDOW_HEIGHT - 30, help_text, ACCENT_COLOR, 1)
+
     pygame.display.flip()
 
 
