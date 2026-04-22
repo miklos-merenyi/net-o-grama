@@ -1,8 +1,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 #include "dlb.h"
 #include "debug.h"
+#include "error_compat.h"
 
 /***************************************************************/
 struct dlb_node* dlb_insertLetter(char thisLetter)

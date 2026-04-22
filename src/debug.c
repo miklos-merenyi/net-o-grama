@@ -4,8 +4,8 @@
 #include <stdarg.h>
 #include <ncurses.h>
 #include <time.h>
-#include <error.h>
 #include <errno.h>
+#include "error_compat.h"
 
 extern int debugLevel;
 

@@ -16,6 +16,7 @@
 #include "debug.h"
 #include "linked.h"
 #include "network.h"
+#include "error_compat.h"
 #ifdef HAVE_SDL2_MIXER
 #include "sound.h"
 extern int disableSound;

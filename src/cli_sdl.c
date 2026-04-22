@@ -1,8 +1,11 @@
 #include <SDL2/SDL.h>
 #include <ctype.h>
 #include <string.h>
+#include <unistd.h>
+#include <errno.h>
 #include "cli_sdl.h"
 #include "client.h"
+#include "error_compat.h"
 
 extern int nop;
 extern struct gamer gamers[MAX_PLAYERS];

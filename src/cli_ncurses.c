@@ -1,11 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <ncurses.h>
 #include <stdarg.h>
 #include <signal.h>
 #include "dlb.h"
 #include "client.h"
+#include "error_compat.h"
 
 extern int nop,id;
 extern struct gamer gamers[MAX_PLAYERS];

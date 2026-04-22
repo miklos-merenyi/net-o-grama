@@ -4,7 +4,11 @@
 #include <unistd.h>
 #include <signal.h>
 #include <setjmp.h>
-#include <error.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include "error_compat.h"
 #include "network.h"
 #include "debug.h"
 int srv;
@@ -48,25 +52,39 @@ int sendf(int socket, char* fmt, ...)
 int connect2server(char *srv_name, uint16_t port)
 {
     int srv=0;
-    struct sockaddr_in server;
-    struct hostent  *gep;
-    int p;
-    p=port;
-    while(1)
-    {
-        server.sin_family=AF_INET;
-        server.sin_port=htons(p);
-        gep=gethostbyname(srv_name);
-        if (gep==NULL)
-            error(1,h_errno,"gethostbyname()");
-        server.sin_addr = *(struct in_addr *)gep-> h_addr;
-        srv=socket(PF_INET, SOCK_STREAM, 0);
-        if (srv <0 )
-            error(1,errno,"socket()");
-        if (connect(srv, (struct sockaddr *) &server, sizeof(server))<0)
-            error(1,errno,"Error connecting to server:"); else
-            return(srv);
+    struct addrinfo hints, *res, *ai;
+    char port_str[6];
+    int err;
+    
+    snprintf(port_str, sizeof(port_str), "%u", port);
+    
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    
+    err = getaddrinfo(srv_name, port_str, &hints, &res);
+    if (err != 0) {
+        error(1, 0, "getaddrinfo(): %s", gai_strerror(err));
     }
+    
+    /* Try each address until we succeed */
+    for (ai = res; ai != NULL; ai = ai->ai_next) {
+        srv = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        if (srv < 0) {
+            continue;
+        }
+        
+        if (connect(srv, ai->ai_addr, ai->ai_addrlen) == 0) {
+            freeaddrinfo(res);
+            return(srv);
+        }
+        
+        close(srv);
+    }
+    
+    freeaddrinfo(res);
+    error(1, errno, "Error connecting to server:");
+    return(-1);
 }
 
 

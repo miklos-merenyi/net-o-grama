@@ -1,7 +1,7 @@
 #define DEBUG
 #include <ncurses.h>
-#include <error.h>
 #include <errno.h>
+#include "error_compat.h"
 void initLogfile();
 void closeLogfile();
 void debug(int level,char* msg, ...);

@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -13,7 +12,6 @@
 #include <time.h>
 #include <glib.h>
 #include "network.h"
-#include <stdio.h>
 #include "debug.h"
 #include "linked.h"
 #include "dlb.h"
@@ -387,18 +385,19 @@ void endGame()
 //
 void mond()
 {
-    size_t hossz=255;
+    size_t hossz=256;
     char *msg;
     struct player* pl;
     int num;
     msg=malloc(hossz*sizeof(char));
     if (!msg) error(1,errno,"malloc()");
 
-    ssize_t len = getline(&msg,&hossz, stdin);
-    if (len <= 0) {
+    /* Use fgets for POSIX compatibility across all platforms */
+    if (fgets(msg, (int)hossz, stdin) == NULL) {
         free(msg);
         return;
     }
+    ssize_t len = (ssize_t)strlen(msg);
 
     if (len > 0 && (msg[len-1] == '\n' || msg[len-1] == '\r')) msg[len-1]='\0';
     if (len > 1 && msg[len-2] == '\r') msg[len-2]='\0';
@@ -571,32 +570,42 @@ int main(int argc, char *argv[])
     GOptionContext *context;
     GError *error = NULL;
     static GOptionEntry entries[5];
-    asprintf(&logfile,"./%s.log",PROGNAME);
+    char logfile_buf[256];
+    snprintf(logfile_buf, sizeof(logfile_buf), "./%s.log", PROGNAME);
+    logfile = logfile_buf;
 
     gchar * port_text;
     gchar * wordlist_text;
     gchar * logfile_text;
     gchar * debuglevel_text;
+    char port_text_buf[256];
+    char wordlist_text_buf[256];
+    char logfile_text_buf[256];
+    char debuglevel_text_buf[256];
 
-    asprintf(&port_text,"TCP port number (default: %d).",PORT);
+    snprintf(port_text_buf, sizeof(port_text_buf), "TCP port number (default: %d).", PORT);
+    port_text = port_text_buf;
     entries[0]=( GOptionEntry)
     {
         "port", 'p', 0, G_OPTION_ARG_INT, &port, port_text, "number"
     };
 
-    asprintf(&wordlist_text,"File containing the list of valid words (default: %s).",wordlist);
+    snprintf(wordlist_text_buf, sizeof(wordlist_text_buf), "File containing the list of valid words (default: %s).", wordlist);
+    wordlist_text = wordlist_text_buf;
     entries[1]=(  GOptionEntry)
     {
         "wordlist", 'w', 0, G_OPTION_ARG_FILENAME, &wordlist, wordlist_text, "file"
     } ;
 
-    asprintf(&logfile_text,"Logfile (default: %s).",logfile);
+    snprintf(logfile_text_buf, sizeof(logfile_text_buf), "Logfile (default: %s).", logfile);
+    logfile_text = logfile_text_buf;
     entries[2]=(  GOptionEntry)
     {
         "logfile", 'l', 0, G_OPTION_ARG_FILENAME, &logfile, logfile_text, "file"
     } ;
 
-    asprintf(&debuglevel_text,"Debug level ( 0 - 10 ; 10 is the most verbose; default: %d).",debugLevel);
+    snprintf(debuglevel_text_buf, sizeof(debuglevel_text_buf), "Debug level ( 0 - 10 ; 10 is the most verbose; default: %d).", debugLevel);
+    debuglevel_text = debuglevel_text_buf;
     entries[3]=(  GOptionEntry)
     {
         "debuglevel", 'd', 0, G_OPTION_ARG_INT, &debugLevel, debuglevel_text, "level"
@@ -614,8 +623,6 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     g_option_context_free(context);
-
-    free(port_text);free(wordlist_text);free(logfile_text);free(debuglevel_text);
 
     initLogfile(logfile);
     createDLBTree(&dlbHead, wordlist);

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <errno.h>
 #include <curses.h>
 #include <getopt.h>
 #include <sys/stat.h>
@@ -9,6 +10,7 @@
 #include "dlb.h"
 #include "linked.h"
 #include "network.h"
+#include "error_compat.h"
 #define SPACE_CHAR ' '
 
 //module level variables for game control
