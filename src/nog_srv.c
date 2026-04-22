@@ -54,7 +54,7 @@ char quit=0;
 int gameIsOn=0;
 extern int gameTime;
 extern int gameStart;
-int autoStart=1;                 // the game will start, if there are at least #autoStart players, and all are ready
+int autoStart=2;                 // the game will start, if there are at least #autoStart players, and all are ready
 int timeNow;
 int availableTime=GAMETIME;
 
