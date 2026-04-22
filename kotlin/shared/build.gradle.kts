@@ -11,13 +11,6 @@ kotlin {
             }
         }
     }
-    jvm {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "11"
-            }
-        }
-    }
     
     sourceSets {
         val commonMain by getting {
@@ -30,11 +23,6 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-            }
-        }
-        val jvmMain by getting {
-            dependencies {
-                implementation("io.ktor:ktor-client-okhttp:2.3.3")
             }
         }
         val androidMain by getting {
