@@ -67,8 +67,8 @@ core*
 # Kotlin build files
 kotlin/build/
 *.iml
-local.properties
-kotlin/.gradle
-kotlin/.idea
-kotlin/shared/build
-kotlin/androidApp/build
+kotlin/local.properties
+kotlin/.gradle/
+kotlin/.idea/
+kotlin/shared/build/
+kotlin/androidApp/build/
