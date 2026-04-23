@@ -3,19 +3,32 @@ package com.nograma
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
@@ -55,6 +68,7 @@ class MainActivity : ComponentActivity() {
 fun GameScreen(activity: MainActivity, createGameClient: (String, Int, String) -> GameClient) {
     var gameClient by remember { mutableStateOf<GameClient?>(null) }
     var gameState by remember { mutableStateOf(GameState()) }
+    var serverConfirmedConnected by remember { mutableStateOf(false) }
     var playerName by remember { mutableStateOf("") }
     var serverAddress by remember { mutableStateOf("192.168.1.18") }
     var serverPort by remember { mutableStateOf("5555") }
@@ -71,6 +85,17 @@ fun GameScreen(activity: MainActivity, createGameClient: (String, Int, String) -
             }
             client.setErrorListener { error ->
                 errorMessage = error
+                isConnecting = false
+            }
+            client.setConnectedConfirmedListener {
+                serverConfirmedConnected = true
+                isConnecting = false
+            }
+            client.setGuessRejectedListener {
+                currentAnswer = ""
+            }
+            client.setGuessAcceptedListener {
+                currentAnswer = ""
             }
         }
     }
@@ -79,341 +104,701 @@ fun GameScreen(activity: MainActivity, createGameClient: (String, Int, String) -
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.background,
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
+                        )
+                    )
+                )
+        ) {
+            AnimatedContent(
+                targetState = gameClient == null,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(300)) + scaleIn(animationSpec = tween(300)) togetherWith
+                    fadeOut(animationSpec = tween(300)) + scaleOut(animationSpec = tween(300))
+                },
+                label = "screenTransition"
+            ) { isConnectionScreen ->
+                when {
+                    isConnectionScreen || !serverConfirmedConnected -> ConnectionScreen(activity, playerName, serverAddress, serverPort, isConnecting, errorMessage, { playerName = it }, { serverAddress = it }, { serverPort = it }, { errorMessage = "" }) { host, port, name ->
+                        isConnecting = true
+                        serverConfirmedConnected = false
+                        val client = createGameClient(host, port, name)
+                        gameClient = client
+                        coroutineScope.launch {
+                            try {
+                                client.connect(name)
+                            } catch (e: Exception) {
+                                errorMessage = "Failed to connect: ${e.message}"
+                                gameClient = null
+                                serverConfirmedConnected = false
+                                isConnecting = false
+                            }
+                        }
+                    }
+                    gameState.currentPhase == GamePhase.WAITING -> WaitingScreen(gameClient) {
+                        gameClient?.disconnect()
+                        gameClient = null
+                        serverConfirmedConnected = false
+                        isConnecting = false
+                        errorMessage = ""
+                    }
+                    gameState.currentPhase == GamePhase.COUNTDOWN -> CountdownScreen(gameState)
+                    gameState.currentPhase == GamePhase.PLAYING -> PlayingScreen(gameState, currentAnswer, { currentAnswer = it }, { gameClient?.submitWord(it) }, { gameClient?.shuffle() }, { gameClient?.disconnect(); gameClient = null; serverConfirmedConnected = false; isConnecting = false; currentAnswer = ""; errorMessage = "" })
+                }
+            }
+            
+            if (errorMessage.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp)),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Text(
+                            errorMessage,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(16.dp),
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ConnectionScreen(
+    activity: MainActivity,
+    playerName: String,
+    serverAddress: String,
+    serverPort: String,
+    isConnecting: Boolean,
+    errorMessage: String,
+    onPlayerNameChange: (String) -> Unit,
+    onServerAddressChange: (String) -> Unit,
+    onServerPortChange: (String) -> Unit,
+    onErrorClear: () -> Unit,
+    onConnect: (String, Int, String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        // App Header
+        Icon(
+            Icons.Filled.PlayArrow,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text(
+            "No-Grama",
+            fontSize = 40.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        
+        Text(
+            "Word Game Challenge",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 32.dp)
+        )
+        
+        // Connection form card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp)),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                if (gameClient == null) {
-                    // Connection setup screen
-                    TextField(
-                        value = serverAddress,
-                        onValueChange = { serverAddress = it },
-                        label = { Text("Server Address") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        placeholder = { Text("e.g., 192.168.1.100 or localhost") }
+                TextField(
+                    value = serverAddress,
+                    onValueChange = onServerAddressChange,
+                    label = { Text("Server Address") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp)),
+                    placeholder = { Text("e.g., 192.168.1.100") },
+                    leadingIcon = { Icon(Icons.Filled.Settings, null) },
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors()
+                )
+                
+                TextField(
+                    value = serverPort,
+                    onValueChange = onServerPortChange,
+                    label = { Text("Server Port") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp)),
+                    placeholder = { Text("e.g., 5555") },
+                    leadingIcon = { Icon(Icons.Filled.Settings, null) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    colors = TextFieldDefaults.colors()
+                )
+                
+                TextField(
+                    value = playerName,
+                    onValueChange = onPlayerNameChange,
+                    label = { Text("Player Name") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp)),
+                    placeholder = { Text("Enter your name") },
+                    leadingIcon = { Icon(Icons.Filled.Person, null) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    colors = TextFieldDefaults.colors()
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Button(
+                    onClick = {
+                        val port = serverPort.toIntOrNull() ?: 5555
+                        onConnect(serverAddress, port, playerName)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                    enabled = !isConnecting && serverAddress.isNotEmpty() && playerName.isNotEmpty(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
                     )
+                ) {
+                    if (isConnecting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    Text(if (isConnecting) "Connecting..." else "Join Game", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Button(
+            onClick = { activity.finish() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(12.dp)),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            )
+        ) {
+            Icon(Icons.Filled.Close, null, tint = MaterialTheme.colorScheme.error)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Exit", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+fun WaitingScreen(
+    gameClient: GameClient?,
+    onDisconnect: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.8f)
+                .clip(RoundedCornerShape(20.dp)),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Icon(
+                    Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                
+                Text(
+                    "Connected!",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                Text(
+                    "Waiting for other players...",
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                
+                CircularProgressIndicator(
+                    modifier = Modifier.size(40.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 3.dp
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Button(
+            onClick = { gameClient?.markReady() },
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .height(52.dp)
+                .clip(RoundedCornerShape(12.dp)),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Icon(Icons.Filled.ThumbUp, null, tint = MaterialTheme.colorScheme.onPrimary)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Ready to Play", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        OutlinedButton(
+            onClick = onDisconnect,
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .height(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+        ) {
+            Icon(Icons.Filled.Close, null, tint = MaterialTheme.colorScheme.outline)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Disconnect", color = MaterialTheme.colorScheme.outline)
+        }
+    }
+}
+
+@Composable
+fun CountdownScreen(gameState: GameState) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                "Game Starting",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 32.dp)
+            )
+            
+            if (gameState.countdownMessage.isNotEmpty()) {
+                AnimatedContent(
+                    targetState = gameState.countdownMessage,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(300)) + scaleIn(animationSpec = tween(300)) togetherWith
+                        fadeOut(animationSpec = tween(300)) + scaleOut(animationSpec = tween(300))
+                    },
+                    label = "countdownTransition"
+                ) { message ->
+                    val (color, size) = when (message) {
+                        "READY" -> Color(0xFFFFD700) to 88.sp
+                        "STEADY" -> Color(0xFFFF1493) to 88.sp
+                        "GO!" -> Color(0xFF00DD00) to 100.sp
+                        else -> MaterialTheme.colorScheme.primary to 72.sp
+                    }
                     
-                    TextField(
-                        value = serverPort,
-                        onValueChange = { serverPort = it },
-                        label = { Text("Server Port") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        placeholder = { Text("e.g., 5555") },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+                    Text(
+                        message,
+                        fontSize = size,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = color,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(32.dp)
                     )
+                }
+            } else {
+                Text(
+                    "Get ready!",
+                    fontSize = 24.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PlayingScreen(
+    gameState: GameState,
+    currentAnswer: String,
+    onAnswerChange: (String) -> Unit,
+    onSubmitWord: (String) -> Unit,
+    onShuffle: () -> Unit,
+    onQuit: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Header with game info
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp)),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        "Current Word",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        gameState.shuffledWord,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )
+                }
+                
+                Card(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primary),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "Time",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Text(
+                            "${gameState.timeRemaining}s",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
+            }
+        }
+        
+        // Player scores
+        if (gameState.players.isNotEmpty()) {
+            Text(
+                "Scores",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+            )
+            
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 0.dp)
+            ) {
+                items(gameState.players) { player ->
+                    val idx = gameState.players.indexOf(player)
+                    val playerColor = when (idx) {
+                        0 -> Color(0xFFFF6B6B)
+                        1 -> Color(0xFF51CF66)
+                        2 -> Color(0xFFFFD93D)
+                        3 -> Color(0xFF6BCFDF)
+                        else -> MaterialTheme.colorScheme.primary
+                    }
                     
-                    TextField(
-                        value = playerName,
-                        onValueChange = { playerName = it },
-                        label = { Text("Player Name") },
+                    Card(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
+                            .widthIn(min = 100.dp)
+                            .clip(RoundedCornerShape(14.dp)),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(RoundedCornerShape(6.dp)),
+                                color = playerColor
+                            ) {}
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            Text(
+                                player.name,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            Text(
+                                "${player.score}",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = playerColor
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Input and buttons
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp)),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextField(
+                        value = currentAnswer,
+                        onValueChange = onAnswerChange,
+                        label = { Text("Your Answer") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(
+                            onSend = {
+                                if (currentAnswer.isNotEmpty()) {
+                                    onSubmitWord(currentAnswer)
+                                }
+                            }
+                        ),
+                        colors = TextFieldDefaults.colors()
                     )
                     
                     Button(
                         onClick = {
-                            isConnecting = true
-                            val port = serverPort.toIntOrNull() ?: 5555
-                            val client = createGameClient(serverAddress, port, playerName)
-                            gameClient = client
-                            
-                            // Launch connection in coroutine
-                            coroutineScope.launch {
-                                try {
-                                    client.connect(playerName)
-                                    isConnecting = false
-                                } catch (e: Exception) {
-                                    errorMessage = "Failed to connect: ${e.message}"
-                                    gameClient = null
-                                    isConnecting = false
-                                }
+                            if (currentAnswer.isNotEmpty()) {
+                                onSubmitWord(currentAnswer)
                             }
                         },
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        enabled = !isConnecting && serverAddress.isNotEmpty() && playerName.isNotEmpty()
-                    ) {
-                        Text(if (isConnecting) "Connecting..." else "Connect")
-                    }
-                    
-                    Button(
-                        onClick = { 
-                            activity.finish()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Quit")
-                    }
-                } else if (gameState.currentPhase == GamePhase.WAITING) {
-                    // Waiting for game to start - show connection status
-                    Text(
-                        "✓ Connected to Server",
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                    
-                    Text(
-                        "Waiting for game to start...",
-                        fontSize = 18.sp,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                    
-                    Button(
-                        onClick = { gameClient?.markReady() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
+                            .height(56.dp)
+                            .clip(RoundedCornerShape(10.dp)),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
-                        )
+                        ),
+                        contentPadding = PaddingValues(0.dp)
                     ) {
-                        Text("Ready to Play")
-                    }
-                    
-                    Button(
-                        onClick = { 
-                            gameClient?.disconnect()
-                            gameClient = null
-                            isConnecting = false
-                            errorMessage = ""
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
-                    ) {
-                        Text("Disconnect")
-                    }
-                } else if (gameState.currentPhase == GamePhase.COUNTDOWN) {
-                    // Countdown phase
-                    Text(
-                        "Game Starting...",
-                        fontSize = 28.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                    
-                    // Display countdown message if available
-                    if (gameState.countdownMessage.isNotEmpty()) {
-                        Text(
-                            gameState.countdownMessage,
-                            fontSize = 72.sp,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            color = when (gameState.countdownMessage) {
-                                "READY" -> androidx.compose.ui.graphics.Color.Yellow
-                                "STEADY" -> androidx.compose.ui.graphics.Color.Magenta
-                                "GO!" -> androidx.compose.ui.graphics.Color.Green
-                                else -> MaterialTheme.colorScheme.primary
-                            },
-                            modifier = Modifier.padding(32.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                    } else {
-                        Text(
-                            "Get ready!",
-                            fontSize = 20.sp,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-                } else if (gameState.currentPhase == GamePhase.PLAYING) {
-                    // Game screen
-                    Text(
-                        gameState.shuffledWord,
-                        fontSize = 32.sp,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                    
-                    Text(
-                        "Time: ${gameState.timeRemaining}s",
-                        fontSize = 18.sp,
-                        modifier = Modifier.padding(8.dp)
-                    )
-                    
-                    // Players and scores
-                    if (gameState.players.isNotEmpty()) {
-                        Text("Players:", fontSize = 14.sp, modifier = Modifier.padding(top = 12.dp, start = 16.dp, bottom = 4.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            gameState.players.forEach { player ->
-                                Card(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(4.dp)
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(8.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Text(
-                                            player.name,
-                                            fontSize = 12.sp,
-                                            modifier = Modifier.padding(bottom = 4.dp)
-                                        )
-                                        Text(
-                                            "${player.score}",
-                                            fontSize = 18.sp,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(top = 4.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        TextField(
-                            value = currentAnswer,
-                            onValueChange = { currentAnswer = it },
-                            label = { Text("Your Answer") },
-                            modifier = Modifier
-                                .weight(1f),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                            keyboardActions = KeyboardActions(
-                                onSend = {
-                                    gameClient?.submitWord(currentAnswer)
-                                    currentAnswer = ""
-                                }
-                            )
-                        )
-                        
-                        Button(
-                            onClick = { 
-                                gameClient?.submitWord(currentAnswer)
-                                currentAnswer = ""
-                            },
-                            modifier = Modifier.align(Alignment.CenterVertically),
-                            contentPadding = PaddingValues(4.dp)
-                        ) {
-                            Icon(Icons.Filled.Send, contentDescription = "Send and Clear", modifier = Modifier.size(20.dp))
-                        }
-                        
-                        Button(
-                            onClick = {
-                                gameClient?.submitWord(currentAnswer)
-                                // Don't clear answer - keep it for next submission
-                            },
-                            modifier = Modifier.align(Alignment.CenterVertically),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondary
-                            ),
-                            contentPadding = PaddingValues(4.dp)
-                        ) {
-                            Text("Keep", fontSize = 12.sp)
-                        }
-                    }
-                    
-                    Button(
-                        onClick = { gameClient?.shuffle() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
-                    ) {
-                        Text("Shuffle")
-                    }
-                    
-                    // Display word slots (places to guess) - like Python client's GUESS area
-                    if (gameState.wordSlots.isNotEmpty()) {
-                        Text("Word Slots (${gameState.wordSlots.count { it.playerIndex == -1 }} remaining):", fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp, start = 16.dp, end = 16.dp))
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 200.dp)
-                                .padding(horizontal = 8.dp)
-                        ) {
-                            items(gameState.wordSlots.size / 3 + 1) { rowIdx ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 2.dp),
-                                    horizontalArrangement = Arrangement.SpaceEvenly
-                                ) {
-                                    repeat(3) { colIdx ->
-                                        val slotIdx = rowIdx * 3 + colIdx
-                                        
-                                        if (slotIdx < gameState.wordSlots.size) {
-                                            val slot = gameState.wordSlots[slotIdx]
-                                            val slotColor = if (slot.playerIndex == -1) {
-                                                androidx.compose.ui.graphics.Color.LightGray
-                                            } else {
-                                                when (slot.playerIndex) {
-                                                    0 -> androidx.compose.ui.graphics.Color.Red
-                                                    1 -> androidx.compose.ui.graphics.Color.Green
-                                                    2 -> androidx.compose.ui.graphics.Color.Yellow
-                                                    3 -> androidx.compose.ui.graphics.Color.Cyan
-                                                    else -> androidx.compose.ui.graphics.Color.LightGray
-                                                }
-                                            }
-                                            Text(
-                                                slot.word,
-                                                fontSize = 12.sp,
-                                                modifier = Modifier.padding(4.dp),
-                                                color = slotColor,
-                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                            )
-                                        } else {
-                                            Spacer(modifier = Modifier.weight(1f))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    Button(
-                        onClick = { 
-                            gameClient?.disconnect()
-                            gameClient = null
-                            isConnecting = false
-                            currentAnswer = ""
-                            errorMessage = ""
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Quit Game")
+                        Icon(Icons.Filled.Send, null, tint = MaterialTheme.colorScheme.onPrimary)
                     }
                 }
                 
-                if (errorMessage.isNotEmpty()) {
-                    Text(
-                        errorMessage,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(16.dp)
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onShuffle,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary
+                        )
+                    ) {
+                        Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Shuffle", fontSize = 13.sp)
+                    }
+                    
+                    Button(
+                        onClick = onQuit,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Icon(Icons.Filled.Close, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Quit", fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }
+        
+        // Word slots
+        if (gameState.wordSlots.isNotEmpty()) {
+            Text(
+                "Found Words (${gameState.wordSlots.count { it.playerIndex != -1 }}/${gameState.wordSlots.size})",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+            )
+            
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                val rows = (gameState.wordSlots.size + 2) / 3
+                repeat(rows) { rowIdx ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        repeat(3) { colIdx ->
+                            val slotIdx = rowIdx * 3 + colIdx
+                            
+                            if (slotIdx < gameState.wordSlots.size) {
+                                val slot = gameState.wordSlots[slotIdx]
+                                val playerColor = if (slot.playerIndex == -1) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    when (slot.playerIndex) {
+                                        0 -> Color(0xFFFF6B6B)
+                                        1 -> Color(0xFF51CF66)
+                                        2 -> Color(0xFFFFD93D)
+                                        3 -> Color(0xFF6BCFDF)
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                }
+                                
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp)),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (slot.playerIndex == -1) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer
+                                    ),
+                                    elevation = CardDefaults.cardElevation(
+                                        defaultElevation = if (slot.playerIndex == -1) 0.dp else 4.dp
+                                    )
+                                ) {
+                                    Text(
+                                        slot.word,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (slot.playerIndex == -1) FontWeight.Normal else FontWeight.Bold,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(8.dp),
+                                        color = playerColor,
+                                        textAlign = TextAlign.Center,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            } else {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }

@@ -286,6 +286,7 @@ void addPlayer(int foglalat)
         removePlayer(newPlayer);
         return;
     }
+    sendf(uj,"ACCEPT:Welcome to the game!");
     echof(0,"Accepted a new player from: %s port: %hd socket: %d\n",inet_ntoa(ugyfel.sin_addr),ntohs(ugyfel.sin_port),uj);
 }
 
