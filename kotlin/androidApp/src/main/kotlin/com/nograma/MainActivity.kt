@@ -483,218 +483,390 @@ fun PlayingScreen(
     onShuffle: () -> Unit,
     onQuit: () -> Unit
 ) {
+    val usedLetterIndices = remember(gameState.shuffledWord, currentAnswer) {
+        val usedIndices = mutableSetOf<Int>()
+        val tempGuess = currentAnswer.toMutableList()
+        gameState.shuffledWord.forEachIndexed { index, letter ->
+            val guessIndex = tempGuess.indexOf(letter)
+            if (guessIndex >= 0) {
+                usedIndices.add(index)
+                tempGuess.removeAt(guessIndex)
+            }
+        }
+        usedIndices
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(16.dp)
     ) {
-        // Header with game info
-        Card(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp)),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .clip(RoundedCornerShape(16.dp)),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
-                Column {
-                    Text(
-                        "Current Word",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        gameState.shuffledWord,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                    )
-                }
-                
-                Card(
+                Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primary),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "Time",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            "Round",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            "${gameState.timeRemaining}s",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            "Build words from the letters below",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
-                }
-            }
-        }
-        
-        // Player scores
-        if (gameState.players.isNotEmpty()) {
-            Text(
-                "Scores",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 4.dp, top = 8.dp)
-            )
-            
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(horizontal = 0.dp)
-            ) {
-                items(gameState.players) { player ->
-                    val idx = gameState.players.indexOf(player)
-                    val playerColor = when (idx) {
-                        0 -> Color(0xFFFF6B6B)
-                        1 -> Color(0xFF51CF66)
-                        2 -> Color(0xFFFFD93D)
-                        3 -> Color(0xFF6BCFDF)
-                        else -> MaterialTheme.colorScheme.primary
-                    }
-                    
-                    Card(
-                        modifier = Modifier
-                            .widthIn(min = 100.dp)
-                            .clip(RoundedCornerShape(14.dp)),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+
+                    Row(
+                        modifier = Modifier,
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column(
+                        Card(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Surface(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(RoundedCornerShape(6.dp)),
-                                color = playerColor
-                            ) {}
-                            
-                            Spacer(modifier = Modifier.height(8.dp))
-                            
-                            Text(
-                                player.name,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.primary),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primary
                             )
-                            
-                            Spacer(modifier = Modifier.height(4.dp))
-                            
-                            Text(
-                                "${player.score}",
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = playerColor
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    "Time",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Text(
+                                    "${gameState.timeRemaining}s",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
+
+                        IconButton(onClick = onQuit) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "Quit",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(28.dp)
                             )
                         }
                     }
                 }
             }
+
+            if (gameState.players.isNotEmpty()) {
+                Text(
+                    "Scores",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                )
+
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 0.dp)
+                ) {
+                    items(gameState.players) { player ->
+                        val idx = gameState.players.indexOf(player)
+                        val playerColor = when (idx) {
+                            0 -> Color(0xFFFF6B6B)
+                            1 -> Color(0xFF51CF66)
+                            2 -> Color(0xFFFFD93D)
+                            3 -> Color(0xFF6BCFDF)
+                            else -> MaterialTheme.colorScheme.primary
+                        }
+
+                        Card(
+                            modifier = Modifier
+                                .widthIn(min = 100.dp)
+                                .clip(RoundedCornerShape(14.dp)),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Surface(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(RoundedCornerShape(6.dp)),
+                                    color = playerColor
+                                ) {}
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    player.name,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Text(
+                                    "${player.score}",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = playerColor
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (gameState.wordSlots.isNotEmpty()) {
+                Text(
+                    "Found Words (${gameState.wordSlots.count { it.playerIndex != -1 }}/${gameState.wordSlots.size})",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    val rows = (gameState.wordSlots.size + 2) / 3
+                    repeat(rows) { rowIdx ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            repeat(3) { colIdx ->
+                                val slotIdx = rowIdx * 3 + colIdx
+
+                                if (slotIdx < gameState.wordSlots.size) {
+                                    val slot = gameState.wordSlots[slotIdx]
+                                    val playerColor = if (slot.playerIndex == -1) {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    } else {
+                                        when (slot.playerIndex) {
+                                            0 -> Color(0xFFFF6B6B)
+                                            1 -> Color(0xFF51CF66)
+                                            2 -> Color(0xFFFFD93D)
+                                            3 -> Color(0xFF6BCFDF)
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
+                                    }
+
+                                    Card(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp)),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (slot.playerIndex == -1) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer
+                                        ),
+                                        elevation = CardDefaults.cardElevation(
+                                            defaultElevation = if (slot.playerIndex == -1) 0.dp else 4.dp
+                                        )
+                                    ) {
+                                        Text(
+                                            slot.word,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (slot.playerIndex == -1) FontWeight.Normal else FontWeight.Bold,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(8.dp),
+                                            color = playerColor,
+                                            textAlign = TextAlign.Center,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                } else {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
         }
-        
-        // Input and buttons
+
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp)),
+                .clip(RoundedCornerShape(18.dp)),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextField(
-                        value = currentAnswer,
-                        onValueChange = onAnswerChange,
-                        label = { Text("Your Answer") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .clip(RoundedCornerShape(10.dp)),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(
-                            onSend = {
-                                if (currentAnswer.isNotEmpty()) {
-                                    onSubmitWord(currentAnswer)
-                                }
-                            }
-                        ),
-                        colors = TextFieldDefaults.colors()
-                    )
-                    
-                    Button(
-                        onClick = {
-                            if (currentAnswer.isNotEmpty()) {
-                                onSubmitWord(currentAnswer)
-                            }
-                        },
-                        modifier = Modifier
-                            .height(56.dp)
-                            .clip(RoundedCornerShape(10.dp)),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        ),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Icon(Icons.Filled.Send, null, tint = MaterialTheme.colorScheme.onPrimary)
-                    }
-                }
-                
+                Text(
+                    "Guess Box",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    val guessCapacity = maxOf(gameState.shuffledWord.length, 1)
+                    repeat(guessCapacity) { index ->
+                        val guessChar = currentAnswer.getOrNull(index)?.toString() ?: ""
+                        OutlinedButton(
+                            onClick = {
+                                if (index < currentAnswer.length) {
+                                    onAnswerChange(
+                                        buildString {
+                                            append(currentAnswer.substring(0, index))
+                                            append(currentAnswer.substring(index + 1))
+                                        }
+                                    )
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                        ) {
+                            Text(
+                                text = if (guessChar.isEmpty()) "_" else guessChar,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (guessChar.isEmpty()) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    "Tap letters to build your guess",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    gameState.shuffledWord.forEachIndexed { index, letter ->
+                        val isUsed = usedLetterIndices.contains(index)
+                        Button(
+                            onClick = {
+                                if (isUsed) {
+                                    onAnswerChange(
+                                        buildString {
+                                            val charList = currentAnswer.toMutableList()
+                                            val removeIndex = charList.indexOf(letter)
+                                            if (removeIndex >= 0) {
+                                                charList.removeAt(removeIndex)
+                                            }
+                                            append(charList.joinToString(""))
+                                        }
+                                    )
+                                } else {
+                                    onAnswerChange(currentAnswer + letter)
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isUsed) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = if (isUsed) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSecondaryContainer,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                disabledContentColor = MaterialTheme.colorScheme.outline
+                            )
+                        ) {
+                            Text(
+                                text = letter.toString(),
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            if (currentAnswer.isNotEmpty()) {
+                                onAnswerChange(currentAnswer.dropLast(1))
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp),
+                        enabled = currentAnswer.isNotEmpty(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Filled.Close, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Back", fontSize = 13.sp)
+                    }
+
                     Button(
                         onClick = onShuffle,
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp)
+                            .height(46.dp)
                             .clip(RoundedCornerShape(10.dp)),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.secondary
@@ -704,101 +876,28 @@ fun PlayingScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Shuffle", fontSize = 13.sp)
                     }
-                    
+
                     Button(
-                        onClick = onQuit,
+                        onClick = {
+                            if (currentAnswer.isNotEmpty()) {
+                                onSubmitWord(currentAnswer)
+                            }
+                        },
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp)
+                            .height(46.dp)
                             .clip(RoundedCornerShape(10.dp)),
+                        enabled = currentAnswer.isNotEmpty(),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
+                            containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Icon(Icons.Filled.Close, null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Filled.Send, null, tint = MaterialTheme.colorScheme.onPrimary)
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Quit", fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
+                        Text("Send", fontSize = 13.sp)
                     }
                 }
             }
         }
-        
-        // Word slots
-        if (gameState.wordSlots.isNotEmpty()) {
-            Text(
-                "Found Words (${gameState.wordSlots.count { it.playerIndex != -1 }}/${gameState.wordSlots.size})",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 4.dp, top = 8.dp)
-            )
-            
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                val rows = (gameState.wordSlots.size + 2) / 3
-                repeat(rows) { rowIdx ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        repeat(3) { colIdx ->
-                            val slotIdx = rowIdx * 3 + colIdx
-                            
-                            if (slotIdx < gameState.wordSlots.size) {
-                                val slot = gameState.wordSlots[slotIdx]
-                                val playerColor = if (slot.playerIndex == -1) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                } else {
-                                    when (slot.playerIndex) {
-                                        0 -> Color(0xFFFF6B6B)
-                                        1 -> Color(0xFF51CF66)
-                                        2 -> Color(0xFFFFD93D)
-                                        3 -> Color(0xFF6BCFDF)
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    }
-                                }
-                                
-                                Card(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(10.dp)),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (slot.playerIndex == -1) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer
-                                    ),
-                                    elevation = CardDefaults.cardElevation(
-                                        defaultElevation = if (slot.playerIndex == -1) 0.dp else 4.dp
-                                    )
-                                ) {
-                                    Text(
-                                        slot.word,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (slot.playerIndex == -1) FontWeight.Normal else FontWeight.Bold,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(8.dp),
-                                        color = playerColor,
-                                        textAlign = TextAlign.Center,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            } else {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
     }
 }
