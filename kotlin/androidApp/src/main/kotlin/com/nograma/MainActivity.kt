@@ -1,5 +1,6 @@
 package com.nograma
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -67,10 +68,15 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun GameScreen(activity: MainActivity, createGameClient: (String, Int, String) -> GameClient) {
+    val prefs = remember {
+        activity.getSharedPreferences("nograma_prefs", Context.MODE_PRIVATE)
+    }
     var gameClient by remember { mutableStateOf<GameClient?>(null) }
     var gameState by remember { mutableStateOf(GameState()) }
     var serverConfirmedConnected by remember { mutableStateOf(false) }
-    var playerName by remember { mutableStateOf("") }
+    var playerName by remember {
+        mutableStateOf(prefs.getString("last_player_name", "") ?: "")
+    }
     var serverAddress by remember { mutableStateOf("192.168.1.18") }
     var serverPort by remember { mutableStateOf("5555") }
     var currentAnswer by remember { mutableStateOf("") }
@@ -100,7 +106,22 @@ fun GameScreen(activity: MainActivity, createGameClient: (String, Int, String) -
                 label = "screenTransition"
             ) { isConnectionScreen ->
                 when {
-                    isConnectionScreen || !serverConfirmedConnected -> ConnectionScreen(activity, playerName, serverAddress, serverPort, isConnecting, errorMessage, { playerName = it }, { serverAddress = it }, { serverPort = it }, { errorMessage = "" }) { host, port, name ->
+                    isConnectionScreen || !serverConfirmedConnected -> ConnectionScreen(
+                        activity,
+                        playerName,
+                        serverAddress,
+                        serverPort,
+                        isConnecting,
+                        errorMessage,
+                        {
+                            playerName = it
+                            prefs.edit().putString("last_player_name", it).apply()
+                        },
+                        { serverAddress = it },
+                        { serverPort = it },
+                        { errorMessage = "" }
+                    ) { host, port, name ->
+                        prefs.edit().putString("last_player_name", name).apply()
                         errorMessage = ""
                         isConnecting = true
                         serverConfirmedConnected = false
@@ -526,7 +547,8 @@ fun PlayingScreen(
                     Color(0xFFFFD93D),
                     Color(0xFF6BCFDF)
                 )
-                val rows = gameState.players.chunked(2)
+                val displayPlayers = gameState.players.sortedBy { it.socket }
+                val rows = displayPlayers.chunked(2)
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -537,7 +559,7 @@ fun PlayingScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             rowPlayers.forEach { player ->
-                                val idx = gameState.players.indexOf(player)
+                                val idx = displayPlayers.indexOf(player)
                                 val playerColor = playerColors.getOrElse(idx) { MaterialTheme.colorScheme.primary }
                                 Row(
                                     modifier = Modifier
@@ -557,12 +579,21 @@ fun PlayingScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    Text(
-                                        "${player.score}",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(start = 6.dp)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(MaterialTheme.colorScheme.surface)
+                                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            "${player.score}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
                                 }
                             }
                             // pad if odd number of players
