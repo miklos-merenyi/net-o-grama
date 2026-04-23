@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -77,29 +78,6 @@ fun GameScreen(activity: MainActivity, createGameClient: (String, Int, String) -
     var errorMessage by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
     
-    LaunchedEffect(gameClient) {
-        gameClient?.let { client ->
-            client.setGameStateListener { newState ->
-                // Update game state when server sends new state
-                gameState = newState
-            }
-            client.setErrorListener { error ->
-                errorMessage = error
-                isConnecting = false
-            }
-            client.setConnectedConfirmedListener {
-                serverConfirmedConnected = true
-                isConnecting = false
-            }
-            client.setGuessRejectedListener {
-                currentAnswer = ""
-            }
-            client.setGuessAcceptedListener {
-                currentAnswer = ""
-            }
-        }
-    }
-    
     MaterialTheme {
         Surface(
             modifier = Modifier
@@ -126,6 +104,26 @@ fun GameScreen(activity: MainActivity, createGameClient: (String, Int, String) -
                         isConnecting = true
                         serverConfirmedConnected = false
                         val client = createGameClient(host, port, name)
+                        
+                        // Set up all listeners BEFORE connecting to catch early responses
+                        client.setGameStateListener { newState ->
+                            gameState = newState
+                        }
+                        client.setErrorListener { error ->
+                            errorMessage = error
+                            isConnecting = false
+                        }
+                        client.setConnectedConfirmedListener {
+                            serverConfirmedConnected = true
+                            isConnecting = false
+                        }
+                        client.setGuessRejectedListener {
+                            currentAnswer = ""
+                        }
+                        client.setGuessAcceptedListener {
+                            currentAnswer = ""
+                        }
+                        
                         gameClient = client
                         coroutineScope.launch {
                             try {
@@ -200,29 +198,6 @@ fun ConnectionScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // App Header
-        Icon(
-            Icons.Filled.PlayArrow,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(
-            "No-Grama",
-            fontSize = 40.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        
-        Text(
-            "Word Game Challenge",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 32.dp)
-        )
-        
         // Connection form card
         Card(
             modifier = Modifier
@@ -474,6 +449,7 @@ fun CountdownScreen(gameState: GameState) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PlayingScreen(
     gameState: GameState,
@@ -497,158 +473,87 @@ fun PlayingScreen(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
+        modifier = Modifier.fillMaxSize()
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "${gameState.timeRemaining}s",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            IconButton(onClick = onQuit, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "Quit",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        
         Column(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Round",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "Build words from the letters below",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier,
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Card(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.primary),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    "Time",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                                Text(
-                                    "${gameState.timeRemaining}s",
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                            }
-                        }
-
-                        IconButton(onClick = onQuit) {
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = "Quit",
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
             if (gameState.players.isNotEmpty()) {
-                Text(
-                    "Scores",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                val playerColors = listOf(
+                    Color(0xFFFF6B6B),
+                    Color(0xFF51CF66),
+                    Color(0xFFFFD93D),
+                    Color(0xFF6BCFDF)
                 )
-
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(horizontal = 0.dp)
+                val rows = gameState.players.chunked(2)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(gameState.players) { player ->
-                        val idx = gameState.players.indexOf(player)
-                        val playerColor = when (idx) {
-                            0 -> Color(0xFFFF6B6B)
-                            1 -> Color(0xFF51CF66)
-                            2 -> Color(0xFFFFD93D)
-                            3 -> Color(0xFF6BCFDF)
-                            else -> MaterialTheme.colorScheme.primary
-                        }
-
-                        Card(
-                            modifier = Modifier
-                                .widthIn(min = 100.dp)
-                                .clip(RoundedCornerShape(14.dp)),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    rows.forEach { rowPlayers ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Surface(
+                            rowPlayers.forEach { player ->
+                                val idx = gameState.players.indexOf(player)
+                                val playerColor = playerColors.getOrElse(idx) { MaterialTheme.colorScheme.primary }
+                                Row(
                                     modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(RoundedCornerShape(6.dp)),
-                                    color = playerColor
-                                ) {}
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Text(
-                                    player.name,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                Text(
-                                    "${player.score}",
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = playerColor
-                                )
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        player.name,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = playerColor,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Text(
+                                        "${player.score}",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                            // pad if odd number of players
+                            if (rowPlayers.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
                             }
                         }
                     }
@@ -657,71 +562,62 @@ fun PlayingScreen(
 
             if (gameState.wordSlots.isNotEmpty()) {
                 Text(
-                    "Found Words (${gameState.wordSlots.count { it.playerIndex != -1 }}/${gameState.wordSlots.size})",
-                    fontSize = 14.sp,
+                    "Words (${gameState.wordSlots.count { it.playerIndex != -1 }}/${gameState.wordSlots.size})",
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                    modifier = Modifier.padding(start = 4.dp, top = 4.dp)
                 )
 
-                Column(
+                val sortedSlots = gameState.wordSlots.sortedBy { it.length }
+                val colSize = maxOf(3, (sortedSlots.size + 3) / 4)
+                val columns = sortedSlots.chunked(colSize)
+
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    val rows = (gameState.wordSlots.size + 2) / 3
-                    repeat(rows) { rowIdx ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    columns.forEach { slotsInGroup ->
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            repeat(3) { colIdx ->
-                                val slotIdx = rowIdx * 3 + colIdx
-
-                                if (slotIdx < gameState.wordSlots.size) {
-                                    val slot = gameState.wordSlots[slotIdx]
-                                    val playerColor = if (slot.playerIndex == -1) {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    } else {
-                                        when (slot.playerIndex) {
-                                            0 -> Color(0xFFFF6B6B)
-                                            1 -> Color(0xFF51CF66)
-                                            2 -> Color(0xFFFFD93D)
-                                            3 -> Color(0xFF6BCFDF)
-                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                        }
-                                    }
-
-                                    Card(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(10.dp)),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = if (slot.playerIndex == -1) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer
-                                        ),
-                                        elevation = CardDefaults.cardElevation(
-                                            defaultElevation = if (slot.playerIndex == -1) 0.dp else 4.dp
-                                        )
-                                    ) {
-                                        Text(
-                                            slot.word,
-                                            fontSize = 11.sp,
-                                            fontWeight = if (slot.playerIndex == -1) FontWeight.Normal else FontWeight.Bold,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(8.dp),
-                                            color = playerColor,
-                                            textAlign = TextAlign.Center,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
+                            slotsInGroup.forEach { slot ->
+                                val playerColor = if (slot.playerIndex == -1) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
                                 } else {
-                                    Spacer(modifier = Modifier.weight(1f))
+                                    when (slot.playerIndex) {
+                                        0 -> Color(0xFFFF6B6B)
+                                        1 -> Color(0xFF51CF66)
+                                        2 -> Color(0xFFFFD93D)
+                                        3 -> Color(0xFF6BCFDF)
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                }
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (slot.playerIndex == -1) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer
+                                    ),
+                                    elevation = CardDefaults.cardElevation(
+                                        defaultElevation = if (slot.playerIndex == -1) 0.dp else 4.dp
+                                    )
+                                ) {
+                                    Text(
+                                        slot.word,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (slot.playerIndex == -1) FontWeight.Normal else FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp).fillMaxWidth(),
+                                        color = playerColor,
+                                        textAlign = TextAlign.Center,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        maxLines = 1
+                                    )
                                 }
                             }
                         }
@@ -729,7 +625,7 @@ fun PlayingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
         Card(
