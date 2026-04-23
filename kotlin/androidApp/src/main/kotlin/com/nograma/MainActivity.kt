@@ -101,6 +101,7 @@ fun GameScreen(activity: MainActivity, createGameClient: (String, Int, String) -
             ) { isConnectionScreen ->
                 when {
                     isConnectionScreen || !serverConfirmedConnected -> ConnectionScreen(activity, playerName, serverAddress, serverPort, isConnecting, errorMessage, { playerName = it }, { serverAddress = it }, { serverPort = it }, { errorMessage = "" }) { host, port, name ->
+                        errorMessage = ""
                         isConnecting = true
                         serverConfirmedConnected = false
                         val client = createGameClient(host, port, name)
@@ -116,6 +117,7 @@ fun GameScreen(activity: MainActivity, createGameClient: (String, Int, String) -
                         client.setConnectedConfirmedListener {
                             serverConfirmedConnected = true
                             isConnecting = false
+                            errorMessage = ""
                         }
                         client.setGuessRejectedListener {
                             currentAnswer = ""
@@ -148,7 +150,7 @@ fun GameScreen(activity: MainActivity, createGameClient: (String, Int, String) -
                 }
             }
             
-            if (errorMessage.isNotEmpty()) {
+            if (errorMessage.isNotEmpty() && !serverConfirmedConnected) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -471,6 +473,7 @@ fun PlayingScreen(
         }
         usedIndices
     }
+    var showQuitConfirm by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -479,16 +482,27 @@ fun PlayingScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.End,
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (gameState.wordSlots.isNotEmpty()) {
+                Text(
+                    "${gameState.wordSlots.count { it.playerIndex != -1 }}/${gameState.wordSlots.size}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f).padding(start = 8.dp)
+                )
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
             Text(
                 "${gameState.timeRemaining}s",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
-            IconButton(onClick = onQuit, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = { showQuitConfirm = true }, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Filled.Close,
                     contentDescription = "Quit",
@@ -561,14 +575,6 @@ fun PlayingScreen(
             }
 
             if (gameState.wordSlots.isNotEmpty()) {
-                Text(
-                    "Words (${gameState.wordSlots.count { it.playerIndex != -1 }}/${gameState.wordSlots.size})",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 4.dp, top = 4.dp)
-                )
-
                 val sortedSlots = gameState.wordSlots.sortedBy { it.length }
                 val colSize = maxOf(3, (sortedSlots.size + 3) / 4)
                 val columns = sortedSlots.chunked(colSize)
@@ -582,8 +588,9 @@ fun PlayingScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     columns.forEach { slotsInGroup ->
+                        val colWeight = (slotsInGroup.maxOfOrNull { it.length } ?: 1).toFloat()
                         Column(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(colWeight),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             slotsInGroup.forEach { slot ->
@@ -641,15 +648,8 @@ fun PlayingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    "Guess Box",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -686,12 +686,6 @@ fun PlayingScreen(
                     }
                 }
 
-                Text(
-                    "Tap letters to build your guess",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -717,8 +711,8 @@ fun PlayingScreen(
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(56.dp),
-                            shape = RoundedCornerShape(14.dp),
+                                .height(44.dp),
+                            shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(0.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (isUsed) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.secondaryContainer,
@@ -795,5 +789,28 @@ fun PlayingScreen(
                 }
             }
         }
+    }
+
+    if (showQuitConfirm) {
+        AlertDialog(
+            onDismissRequest = { showQuitConfirm = false },
+            title = { Text("Quit game?") },
+            text = { Text("Are you sure you want to quit this round?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showQuitConfirm = false
+                        onQuit()
+                    }
+                ) {
+                    Text("Quit")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showQuitConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
